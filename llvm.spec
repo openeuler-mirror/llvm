@@ -1,22 +1,19 @@
-%{!?_pkgdocdir: %global _pkgdocdir %{_docdir}/%{name}-%{version}}
-
 Name:		llvm
 Version:	7.0.0
-Release:        4
+Release:        5
 Summary:	The Low Level Virtual Machine
-License:	NCSA	
+License:	NCSA
 URL:		http://llvm.org
 Source0:	http://releases.llvm.org/7.0.0/%{name}-%{version}.src.tar.xz
+Source1:        run-lit-tests
 Patch0:         0001-CMake-Split-static-library-exports-into-their-own-ex.patch
 Patch1:         0001-Filter-out-cxxflags-not-supported-by-clang.patch
 Patch2:         0001-unittests-Don-t-install-TestPlugin.so.patch
 Patch3:         0001-CMake-Don-t-prefer-python2.7.patch
 Patch4:         0001-Don-t-set-rpath-when-installing.patch
 
-BuildRequires:  gcc gcc-c++ cmake git ninja-build
-BuildRequires:	zlib-devel libffi-devel ncurses-devel
-BuildRequires:	python3-sphinx
-BuildRequires:	multilib-rpm-config binutils-devel valgrind-devel
+BuildRequires:  gcc gcc-c++ cmake ninja-build zlib-devel libffi-devel ncurses-devel libstdc++-static
+BuildRequires:	python3-sphinx multilib-rpm-config binutils-devel valgrind-devel
 BuildRequires:  libedit-devel python3-devel
 Provides:       %{name}-libs = %{version}-%{release}
 Obsoletes:      %{name}-libs < %{version}-%{release}
@@ -33,11 +30,15 @@ to small research projects.
 %package        devel
 Summary:        Development files for %{name}
 Requires:       %{name} = %{version}-%{release}
-Requires:       libedit-devel
+Requires:       libedit-devel python3-lit binutils gcc
 Requires(post): %{_sbindir}/alternatives
 Requires(postun): %{_sbindir}/alternatives
 Provides:       %{name}-static = %{version}-%{release}
 Obsoletes:      %{name}-static < %{version}-%{release}
+Provides:       %{name}-googletest = %{version}-%{release}
+Obsoletes:      %{name}-googletest < %{version}-%{release}
+Provides:       %{name}-test = %{version}-%{release}
+Obsoletes:      %{name}-test < %{version}-%{release}
 
 %description    devel
 The %{name}-devel package contains libraries and header files for
@@ -47,6 +48,8 @@ developing applications that use %{name}.
 Summary: 	Doc files for %{name}
 Buildarch:	noarch
 Requires:	man
+Provides:       %{name}-doc = %{version}-%{release}
+Obsoletes:      %{name}-doc < %{version}-%{release}
 
 %description 	help
 The %{name}-help package contains doc files for %{name}.
@@ -54,13 +57,17 @@ The %{name}-help package contains doc files for %{name}.
 %prep
 %autosetup -n %{name}-%{version}.src -p1
 pathfix.py -i %{__python3} -pn test/BugPoint/compile-custom.ll.py tools/opt-viewer/*.py
+sed -i 's~@TOOLS_DIR@~%{_libdir}/%{name}~' %{SOURCE1}
 
 %build
-mkdir -p _build; pushd _build
-
+mkdir -p _build
+cd _build
+%global optflags %(echo %{optflags} | sed 's/-g /-g1 /')
 %cmake .. -G Ninja \
 	-DBUILD_SHARED_LIBS:BOOL=OFF \
 	-DCMAKE_BUILD_TYPE=RelWithDebInfo \
+	-DCMAKE_C_FLAGS_RELWITHDEBINFO="%{optflags} -DNDEBUG" \
+	-DCMAKE_CXX_FLAGS_RELWITHDEBINFO="%{optflags} -DNDEBUG" \
 %if 0%{?__isa_bits} == 64
 	-DLLVM_LIBDIR_SUFFIX=64 \
 %else
@@ -83,13 +90,13 @@ mkdir -p _build; pushd _build
 	-DLLVM_BUILD_RUNTIME:BOOL=ON \
 	-DLLVM_INCLUDE_TOOLS:BOOL=ON \
 	-DLLVM_BUILD_TOOLS:BOOL=ON \
-	-DLLVM_INCLUDE_TESTS:BOOL=OFF \
-	-DLLVM_BUILD_TESTS:BOOL=OFF \
+	-DLLVM_INCLUDE_TESTS:BOOL=ON \
+	-DLLVM_BUILD_TESTS:BOOL=ON \
 	-DLLVM_INCLUDE_EXAMPLES:BOOL=ON \
 	-DLLVM_BUILD_EXAMPLES:BOOL=OFF \
 	-DLLVM_INCLUDE_UTILS:BOOL=ON \
 	-DLLVM_INSTALL_UTILS:BOOL=ON \
-	-DLLVM_UTILS_INSTALL_DIR:PATH=%{buildroot}/%{_libdir}/%{name} \
+	-DLLVM_UTILS_INSTALL_DIR:PATH=%{buildroot}%{_libdir}/%{name} \
 	-DLLVM_INCLUDE_DOCS:BOOL=ON \
 	-DLLVM_BUILD_DOCS:BOOL=ON \
 	-DLLVM_ENABLE_SPHINX:BOOL=ON \
@@ -101,23 +108,47 @@ mkdir -p _build; pushd _build
 	-DLLVM_INSTALL_TOOLCHAIN_ONLY:BOOL=OFF \
 	-DSPHINX_WARNINGS_AS_ERRORS=OFF \
 	-DCMAKE_INSTALL_PREFIX=%{buildroot}/usr \
-	-DLLVM_INSTALL_SPHINX_HTML_DIR=%{buildroot}/%{_pkgdocdir}/html \
+	-DLLVM_INSTALL_SPHINX_HTML_DIR=%{buildroot}%{_pkgdocdir}/html \
 	-DSPHINX_EXECUTABLE=%{_bindir}/sphinx-build-3
 
 ninja -v
 
 %install
-pushd _build
+cd _build
 ninja -v install
-mv -v %{buildroot}/%{_bindir}/llvm-config{,-%{__isa_bits}}
+
+mv -v %{buildroot}%{_bindir}/llvm-config{,-%{__isa_bits}}
+
+%multilib_fix_c_header --file %{_includedir}/llvm/Config/llvm-config.h
 
 for f in lli-child-target llvm-isel-fuzzer llvm-opt-fuzzer yaml-bench; do
-    install -m 0755 ./bin/$f %{buildroot}/%{_libdir}/%{name}
+install -m 0755 ./bin/$f %{buildroot}%{_libdir}/%{name}
 done
 
-popd
+%global install_srcdir %{buildroot}%{_datadir}/llvm/src
+%global lit_cfg test/lit.site.cfg.py
+%global lit_unit_cfg test/Unit/lit.site.cfg.py
 
-find %{buildroot}/%{_libdir}/%{name} -ignore_readdir_race -iname 'cmake*' -exec rm -Rf '{}' ';' || true
+cd ..
+
+install -d %{install_srcdir}
+install -d %{install_srcdir}/utils/
+cp -R utils/unittest %{install_srcdir}/utils/
+
+cat _build/test/lit.site.cfg.py >> %{lit_cfg}
+cat _build/test/Unit/lit.site.cfg.py >> %{lit_unit_cfg}
+sed -i -e s~`pwd`/_build~%{_prefix}~g -e s~`pwd`~.~g %{lit_cfg} %{lit_cfg} %{lit_unit_cfg}
+
+sed -i 's~\(config.llvm_obj_root = \)"[^"]\+"~\1"%{_libdir}/%{name}"~' %{lit_unit_cfg}
+
+install -d %{buildroot}%{_libexecdir}/tests/llvm
+install -m 0755 %{SOURCE1} %{buildroot}%{_libexecdir}/tests/llvm
+
+install -d %{buildroot}%{_datadir}/llvm/
+tar -czf %{install_srcdir}/test.tar.gz test/
+
+cp -R _build/unittests %{buildroot}%{_libdir}/%{name}/
+find %{buildroot}%{_libdir}/%{name} -ignore_readdir_race -iname 'cmake*' -exec rm -Rf '{}' ';' || true
 
 %check
 cd _build
@@ -135,11 +166,14 @@ if [ $1 -eq 0 ]; then
 fi
 
 %files
-%license LICENSE.TXT 
+%license LICENSE.TXT
 %{_bindir}/*
 %{_libdir}/%{name}/*
 %{_datadir}/opt-viewer/*
 %{_libdir}/*.so*
+%exclude %{_libdir}/libLLVM.so
+%exclude %{_bindir}/llvm-config-%{__isa_bits}
+%exclude %{_libdir}/%{name}/unittests/
 
 %files devel
 %{_bindir}/llvm-config-%{__isa_bits}
@@ -148,13 +182,27 @@ fi
 %{_libdir}/cmake/llvm/*
 %{_libdir}/libLLVM.so
 %{_libdir}/*.a
+%{_datadir}/llvm/src/utils
+%{_libexecdir}/tests/llvm/
+%{_libdir}/%{name}/unittests/
+%{_datadir}/llvm/src/test.tar.gz
+%{_libdir}/%{name}/yaml-bench
+%{_libdir}/%{name}/lli-child-target
+%{_libdir}/%{name}/llvm-isel-fuzzer
+%{_libdir}/%{name}/llvm-opt-fuzzer
 
 %files help
 %doc %{_pkgdocdir}/html
 %{_mandir}/man1/*
 
 %changelog
-* Sat Sep 29 2019 luhuaxin <luhuaxin@huawei.com> - 7.0.0-4
+* Mon Oct 28 2019 jiangchuangang <jiangchuangang@huawei.com> -7.0.0-5
+- Type: enhancement
+- ID: NA
+- SUG: NA
+- DESC: add test files
+
+* Sun Sep 29 2019 luhuaxin <luhuaxin@huawei.com> - 7.0.0-4
 - Type: enhancement
 - ID: NA
 - SUG: NA
