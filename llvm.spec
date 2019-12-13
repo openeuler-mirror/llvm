@@ -1,6 +1,6 @@
 Name:		llvm
 Version:	7.0.0
-Release:        5
+Release:        6
 Summary:	The Low Level Virtual Machine
 License:	NCSA
 URL:		http://llvm.org
@@ -15,8 +15,6 @@ Patch4:         0001-Don-t-set-rpath-when-installing.patch
 BuildRequires:  gcc gcc-c++ cmake ninja-build zlib-devel libffi-devel ncurses-devel libstdc++-static
 BuildRequires:	python3-sphinx multilib-rpm-config binutils-devel valgrind-devel
 BuildRequires:  libedit-devel python3-devel
-Provides:       %{name}-libs = %{version}-%{release}
-Obsoletes:      %{name}-libs < %{version}-%{release}
 
 %description
 LLVM is a compiler infrastructure designed for compile-time, link-time,
@@ -27,12 +25,18 @@ The LLVM compiler infrastructure supports a wide range of projects,
 from industrial strength compilers to specialized JIT applications
 to small research projects.
 
+%package libs
+Summary:LLVM shared libraries
+
+%description libs
+Shared libraries for the LLVM compiler infrastructure.
+
 %package        devel
 Summary:        Development files for %{name}
 Requires:       %{name} = %{version}-%{release}
 Requires:       libedit-devel python3-lit binutils gcc
-Requires(post): %{_sbindir}/alternatives
-Requires(postun): %{_sbindir}/alternatives
+Requires(post):  %{_sbindir}/alternatives
+Requires(postun):%{_sbindir}/alternatives
 Provides:       %{name}-static = %{version}-%{release}
 Obsoletes:      %{name}-static < %{version}-%{release}
 Provides:       %{name}-googletest = %{version}-%{release}
@@ -170,10 +174,12 @@ fi
 %{_bindir}/*
 %{_libdir}/%{name}/*
 %{_datadir}/opt-viewer/*
-%{_libdir}/*.so*
-%exclude %{_libdir}/libLLVM.so
 %exclude %{_bindir}/llvm-config-%{__isa_bits}
 %exclude %{_libdir}/%{name}/unittests/
+
+%files libs
+%{_libdir}/*.so*
+%exclude %{_libdir}/libLLVM.so
 
 %files devel
 %{_bindir}/llvm-config-%{__isa_bits}
@@ -196,6 +202,12 @@ fi
 %{_mandir}/man1/*
 
 %changelog
+* Fri Nov 1 2019 jiangchuangang <jiangchuangang@huawei.com> -7.0.0-6
+- Type: enhancement
+- ID: NA
+- SUG: NA
+- DESC: add libs package
+
 * Mon Oct 28 2019 jiangchuangang <jiangchuangang@huawei.com> -7.0.0-5
 - Type: enhancement
 - ID: NA
