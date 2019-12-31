@@ -1,6 +1,6 @@
 Name:		llvm
 Version:	7.0.0
-Release:        6
+Release:        7
 Summary:	The Low Level Virtual Machine
 License:	NCSA
 URL:		http://llvm.org
@@ -192,16 +192,18 @@ fi
 %{_libexecdir}/tests/llvm/
 %{_libdir}/%{name}/unittests/
 %{_datadir}/llvm/src/test.tar.gz
-%{_libdir}/%{name}/yaml-bench
-%{_libdir}/%{name}/lli-child-target
-%{_libdir}/%{name}/llvm-isel-fuzzer
-%{_libdir}/%{name}/llvm-opt-fuzzer
 
 %files help
 %doc %{_pkgdocdir}/html
 %{_mandir}/man1/*
 
 %changelog
+* Tue Dec 31 2019 openEuler Buildteam <buildteam@openeuler.org> -7.0.0-7
+- Type: enhancement
+- ID: NA
+- SUG: NA
+- DESC: delete conflict files in llvm
+
 * Fri Nov 1 2019 jiangchuangang <jiangchuangang@huawei.com> -7.0.0-6
 - Type: enhancement
 - ID: NA
