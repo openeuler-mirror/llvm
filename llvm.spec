@@ -1,20 +1,13 @@
 Name:		llvm
 Version:	7.0.0
-Release:        7
+Release:        8
 Summary:	The Low Level Virtual Machine
 License:	NCSA
 URL:		http://llvm.org
 Source0:	http://releases.llvm.org/7.0.0/%{name}-%{version}.src.tar.xz
-Source1:        run-lit-tests
-Patch0:         0001-CMake-Split-static-library-exports-into-their-own-ex.patch
-Patch1:         0001-Filter-out-cxxflags-not-supported-by-clang.patch
-Patch2:         0001-unittests-Don-t-install-TestPlugin.so.patch
-Patch3:         0001-CMake-Don-t-prefer-python2.7.patch
-Patch4:         0001-Don-t-set-rpath-when-installing.patch
 
 BuildRequires:  gcc gcc-c++ cmake ninja-build zlib-devel libffi-devel ncurses-devel libstdc++-static
-BuildRequires:	python3-sphinx multilib-rpm-config binutils-devel valgrind-devel
-BuildRequires:  libedit-devel python3-devel
+BuildRequires:	python3-sphinx binutils-devel valgrind-devel libedit-devel python3-devel
 
 %description
 LLVM is a compiler infrastructure designed for compile-time, link-time,
@@ -61,7 +54,6 @@ The %{name}-help package contains doc files for %{name}.
 %prep
 %autosetup -n %{name}-%{version}.src -p1
 pathfix.py -i %{__python3} -pn test/BugPoint/compile-custom.ll.py tools/opt-viewer/*.py
-sed -i 's~@TOOLS_DIR@~%{_libdir}/%{name}~' %{SOURCE1}
 
 %build
 mkdir -p _build
@@ -123,8 +115,6 @@ ninja -v install
 
 mv -v %{buildroot}%{_bindir}/llvm-config{,-%{__isa_bits}}
 
-%multilib_fix_c_header --file %{_includedir}/llvm/Config/llvm-config.h
-
 for f in lli-child-target llvm-isel-fuzzer llvm-opt-fuzzer yaml-bench; do
 install -m 0755 ./bin/$f %{buildroot}%{_libdir}/%{name}
 done
@@ -146,7 +136,6 @@ sed -i -e s~`pwd`/_build~%{_prefix}~g -e s~`pwd`~.~g %{lit_cfg} %{lit_cfg} %{lit
 sed -i 's~\(config.llvm_obj_root = \)"[^"]\+"~\1"%{_libdir}/%{name}"~' %{lit_unit_cfg}
 
 install -d %{buildroot}%{_libexecdir}/tests/llvm
-install -m 0755 %{SOURCE1} %{buildroot}%{_libexecdir}/tests/llvm
 
 install -d %{buildroot}%{_datadir}/llvm/
 tar -czf %{install_srcdir}/test.tar.gz test/
@@ -189,7 +178,6 @@ fi
 %{_libdir}/libLLVM.so
 %{_libdir}/*.a
 %{_datadir}/llvm/src/utils
-%{_libexecdir}/tests/llvm/
 %{_libdir}/%{name}/unittests/
 %{_datadir}/llvm/src/test.tar.gz
 
@@ -198,6 +186,12 @@ fi
 %{_mandir}/man1/*
 
 %changelog
+* Sat Jan 11 2020 openEuler Buildteam <buildteam@openeuler.org> - 7.0.0-8
+- Type: enhancement
+- ID: NA
+- SUG: NA
+- DESC: remove unnecessary files
+
 * Tue Dec 31 2019 openEuler Buildteam <buildteam@openeuler.org> -7.0.0-7
 - Type: enhancement
 - ID: NA
