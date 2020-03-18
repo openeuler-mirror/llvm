@@ -1,11 +1,16 @@
 Name:		llvm
 Version:	7.0.0
-Release:        8
+Release:        9
 Summary:	The Low Level Virtual Machine
 License:	NCSA
 URL:		http://llvm.org
 Source0:	http://releases.llvm.org/7.0.0/%{name}-%{version}.src.tar.xz
 
+Patch0: CMake-Split-static-library-exports-into-their-own-ex.patch
+Patch1: Filter-out-cxxflags-not-supported-by-clang.patch
+Patch2: CMake-Don-t-prefer-python2.7.patch
+Patch3: Don-t-set-rpath-when-installing.patch
+ 
 BuildRequires:  gcc gcc-c++ cmake ninja-build zlib-devel libffi-devel ncurses-devel libstdc++-static
 BuildRequires:	python3-sphinx binutils-devel valgrind-devel libedit-devel python3-devel
 
@@ -186,6 +191,12 @@ fi
 %{_mandir}/man1/*
 
 %changelog
+* Wed Mar 18 2020 openEuler Buildteam <buildteam@openeuler.org> - 7.0.0-9
+- Type: enhancement
+- ID: NA
+- SUG: NA
+- DESC: add four patches
+
 * Sat Jan 11 2020 openEuler Buildteam <buildteam@openeuler.org> - 7.0.0-8
 - Type: enhancement
 - ID: NA
