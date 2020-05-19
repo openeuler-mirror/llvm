@@ -1,6 +1,6 @@
 Name:		llvm
 Version:	7.0.0
-Release:        9
+Release:        10
 Summary:	The Low Level Virtual Machine
 License:	NCSA
 URL:		http://llvm.org
@@ -191,6 +191,9 @@ fi
 %{_mandir}/man1/*
 
 %changelog
+* Mon May 18 2020 wangchen <wangchen137@huawei.com> - 7.0.0-10
+- rebuild for llvm
+
 * Wed Mar 18 2020 openEuler Buildteam <buildteam@openeuler.org> - 7.0.0-9
 - Type: enhancement
 - ID: NA
