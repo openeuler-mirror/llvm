@@ -4,7 +4,7 @@ Release:	0
 Summary:	The Low Level Virtual Machine
 License:	NCSA
 URL:		http://llvm.org
-Source0:	http://releases.llvm.org/10.0.0/%{name}-%{version}.src.tar.xz
+Source0:	https://github.com/llvm/llvm-project/releases/download/llvmorg-%{version}/%{name}-%{version}.src.tar.xz
 
 #Patch0: CMake-Split-static-library-exports-into-their-own-ex.patch
 #Patch1: Filter-out-cxxflags-not-supported-by-clang.patch
