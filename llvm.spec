@@ -6,11 +6,6 @@ License:	NCSA
 URL:		http://llvm.org
 Source0:	https://github.com/llvm/llvm-project/releases/download/llvmorg-%{version}/%{name}-%{version}.src.tar.xz
 
-#Patch0: CMake-Split-static-library-exports-into-their-own-ex.patch
-#Patch1: Filter-out-cxxflags-not-supported-by-clang.patch
-#Patch2: CMake-Don-t-prefer-python2.7.patch
-#Patch3: Don-t-set-rpath-when-installing.patch
- 
 BuildRequires:  gcc gcc-c++ cmake ninja-build zlib-devel libffi-devel ncurses-devel libstdc++-static
 BuildRequires:	python3-sphinx binutils-devel valgrind-devel libedit-devel python3-devel
 BuildRequires:  python3-recommonmark
