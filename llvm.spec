@@ -1,18 +1,14 @@
 Name:		llvm
-Version:	7.0.0
-Release:        9
+Version:	10.0.0
+Release:	0
 Summary:	The Low Level Virtual Machine
 License:	NCSA
 URL:		http://llvm.org
-Source0:	http://releases.llvm.org/7.0.0/%{name}-%{version}.src.tar.xz
+Source0:	https://github.com/llvm/llvm-project/releases/download/llvmorg-%{version}/%{name}-%{version}.src.tar.xz
 
-Patch0: CMake-Split-static-library-exports-into-their-own-ex.patch
-Patch1: Filter-out-cxxflags-not-supported-by-clang.patch
-Patch2: CMake-Don-t-prefer-python2.7.patch
-Patch3: Don-t-set-rpath-when-installing.patch
- 
 BuildRequires:  gcc gcc-c++ cmake ninja-build zlib-devel libffi-devel ncurses-devel libstdc++-static
 BuildRequires:	python3-sphinx binutils-devel valgrind-devel libedit-devel python3-devel
+BuildRequires:  python3-recommonmark
 
 %description
 LLVM is a compiler infrastructure designed for compile-time, link-time,
@@ -118,6 +114,7 @@ ninja -v
 cd _build
 ninja -v install
 
+find %{buildroot}%{_libdir}/cmake/llvm/ -type f | xargs sed -i "s|%{buildroot}||g"
 mv -v %{buildroot}%{_bindir}/llvm-config{,-%{__isa_bits}}
 
 for f in lli-child-target llvm-isel-fuzzer llvm-opt-fuzzer yaml-bench; do
@@ -191,6 +188,9 @@ fi
 %{_mandir}/man1/*
 
 %changelog
+* Wed Jun 03 2020 SimpleUpdate Robot <tc@openeuler.org> - 10.0.0-0
+- Update to version 10.0.0
+
 * Wed Mar 18 2020 openEuler Buildteam <buildteam@openeuler.org> - 7.0.0-9
 - Type: enhancement
 - ID: NA
