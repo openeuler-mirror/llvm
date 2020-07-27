@@ -1,6 +1,6 @@
 Name:		llvm
 Version:	7.0.0
-Release:        9
+Release:        10
 Summary:	The Low Level Virtual Machine
 License:	NCSA
 URL:		http://llvm.org
@@ -10,6 +10,8 @@ Patch0: CMake-Split-static-library-exports-into-their-own-ex.patch
 Patch1: Filter-out-cxxflags-not-supported-by-clang.patch
 Patch2: CMake-Don-t-prefer-python2.7.patch
 Patch3: Don-t-set-rpath-when-installing.patch
+Patch4: Ensure-that-variant-part-discriminator-is-read-by-Me.patch
+Patch5: test-Fix-Assembler-debug-info.ll.patch
  
 BuildRequires:  gcc gcc-c++ cmake ninja-build zlib-devel libffi-devel ncurses-devel libstdc++-static
 BuildRequires:	python3-sphinx binutils-devel valgrind-devel libedit-devel python3-devel
@@ -191,6 +193,13 @@ fi
 %{_mandir}/man1/*
 
 %changelog
+* Wed Jul 22 2020 Hugel <gengqihu1@huawei.com> - 7.0.0-10
+- Type: enhancement
+- ID: NA
+- SUG: NA
+- DESC: Ensure that variant part discriminator is read by MetadataLoader
+        Fix Assembler/debug-info.ll
+
 * Wed Mar 18 2020 openEuler Buildteam <buildteam@openeuler.org> - 7.0.0-9
 - Type: enhancement
 - ID: NA
