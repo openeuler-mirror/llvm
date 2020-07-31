@@ -1,20 +1,15 @@
 Name:		llvm
-Version:	7.0.0
-Release:        10
+Version:	10.0.1
+Release:        1
 Summary:	The Low Level Virtual Machine
 License:	NCSA
 URL:		http://llvm.org
-Source0:	http://releases.llvm.org/7.0.0/%{name}-%{version}.src.tar.xz
+Source0:	https://github.com/llvm/llvm-project/releases/download/llvmorg-%{version}/%{name}-%{version}.src.tar.xz
 
-Patch0: CMake-Split-static-library-exports-into-their-own-ex.patch
-Patch1: Filter-out-cxxflags-not-supported-by-clang.patch
-Patch2: CMake-Don-t-prefer-python2.7.patch
-Patch3: Don-t-set-rpath-when-installing.patch
-Patch4: Ensure-that-variant-part-discriminator-is-read-by-Me.patch
-Patch5: test-Fix-Assembler-debug-info.ll.patch
- 
 BuildRequires:  gcc gcc-c++ cmake ninja-build zlib-devel libffi-devel ncurses-devel libstdc++-static
 BuildRequires:	python3-sphinx binutils-devel valgrind-devel libedit-devel python3-devel
+BuildRequires:  python3-recommonmark
+BuildRequires:  llvm-libs
 
 %description
 LLVM is a compiler infrastructure designed for compile-time, link-time,
@@ -120,6 +115,7 @@ ninja -v
 cd _build
 ninja -v install
 
+find %{buildroot}%{_libdir}/cmake/llvm -type f | xargs sed -i "s|%{buildroot}||g"
 mv -v %{buildroot}%{_bindir}/llvm-config{,-%{__isa_bits}}
 
 for f in lli-child-target llvm-isel-fuzzer llvm-opt-fuzzer yaml-bench; do
@@ -149,6 +145,10 @@ tar -czf %{install_srcdir}/test.tar.gz test/
 
 cp -R _build/unittests %{buildroot}%{_libdir}/%{name}/
 find %{buildroot}%{_libdir}/%{name} -ignore_readdir_race -iname 'cmake*' -exec rm -Rf '{}' ';' || true
+
+#TODO: clang rust mesa packages will be unresolvable without this work-around
+cp -p %{_libdir}/libLLVM-7*.so %{buildroot}%{_libdir}
+cp -p %{_libdir}/libLTO.so.7 %{buildroot}%{_libdir}
 
 %check
 cd _build
@@ -193,6 +193,12 @@ fi
 %{_mandir}/man1/*
 
 %changelog
+* Tue Jul 28 2020 Liquor <lirui130@huawei.com> - 10.0.1-1
+- Type: update
+- ID: NA
+- SUG: NA
+- DESC:update to 10.0.1
+
 * Wed Jul 22 2020 Hugel <gengqihu1@huawei.com> - 7.0.0-10
 - Type: enhancement
 - ID: NA
