@@ -1,6 +1,6 @@
 Name:		llvm
 Version:	10.0.1
-Release:        2
+Release:        3
 Summary:	The Low Level Virtual Machine
 License:	NCSA
 URL:		http://llvm.org
@@ -9,7 +9,6 @@ Source0:	https://github.com/llvm/llvm-project/releases/download/llvmorg-%{versio
 BuildRequires:  gcc gcc-c++ cmake ninja-build zlib-devel libffi-devel ncurses-devel libstdc++-static
 BuildRequires:	python3-sphinx binutils-devel valgrind-devel libedit-devel python3-devel
 BuildRequires:  python3-recommonmark
-BuildRequires:  llvm-libs
 
 %description
 LLVM is a compiler infrastructure designed for compile-time, link-time,
@@ -154,10 +153,6 @@ mkdir -p %{buildroot}%{_libdir}/%{name}
 cp -R _build/unittests %{buildroot}%{_libdir}/%{name}/
 find %{buildroot}%{_libdir}/%{name} -ignore_readdir_race -iname 'cmake*' -exec rm -Rf '{}' ';' || true
 
-#TODO: clang rust mesa packages will be unresolvable without this work-around
-cp -p %{_libdir}/libLLVM-7*.so %{buildroot}%{_libdir}
-cp -p %{_libdir}/libLTO.so.7 %{buildroot}%{_libdir}
-
 %check
 cd _build
 ninja check-all || :
@@ -201,6 +196,12 @@ fi
 %{_mandir}/man1/*
 
 %changelog
+* Fri Sep 25 2020 Hugel <gengqihu1@huawei.com> - 10.0.1-3
+- Type: enhancement
+- ID: NA
+- SUG: NA
+- DESC: Delete the .so file of old version
+
 * Tue Aug 18 2020 Liquor <lirui130@huawei.com> - 10.0.1-2
 - Type: bugfix
 - ID: NA
