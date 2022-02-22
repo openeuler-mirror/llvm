@@ -1,6 +1,6 @@
 Name:		llvm
 Version:	12.0.1
-Release:        1
+Release:        2
 Summary:	The Low Level Virtual Machine
 License:	NCSA
 URL:		http://llvm.org
@@ -8,7 +8,7 @@ Source0:	https://github.com/llvm/llvm-project/releases/download/llvmorg-%{versio
 
 BuildRequires:  gcc gcc-c++ cmake ninja-build zlib-devel libffi-devel ncurses-devel libstdc++-static
 BuildRequires:	python3-sphinx binutils-devel valgrind-devel libedit-devel python3-devel
-BuildRequires:  python3-recommonmark llvm-libs
+BuildRequires:  python3-recommonmark
 
 %description
 LLVM is a compiler infrastructure designed for compile-time, link-time,
@@ -153,10 +153,6 @@ mkdir -p %{buildroot}%{_libdir}/%{name}
 cp -R _build/unittests %{buildroot}%{_libdir}/%{name}/
 find %{buildroot}%{_libdir}/%{name} -ignore_readdir_race -iname 'cmake*' -exec rm -Rf '{}' ';' || true
 
-#TODO: clang rust mesa packages will be unresolvable without this work-around
-cp -p %{_libdir}/libLLVM-10*.so %{buildroot}%{_libdir}
-cp -p %{_libdir}/libLTO.so.10 %{buildroot}%{_libdir}
-
 %check
 cd _build
 ninja check-all || :
@@ -200,6 +196,12 @@ fi
 %{_mandir}/man1/*
 
 %changelog
+* Tue Feb 22 2022 wangjie <wangjie375@h-partners.com> - 12.0.1-2
+- Type: enhancement
+- ID: NA
+- SUG: NA
+- DESC: Delete the .so file of old version
+
 * Mon Dec 13 2021 zoulin <zoulin13@huawei.com> - 12.0.1-1
 - Type: enhancement
 - ID: NA
