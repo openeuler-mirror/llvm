@@ -1,6 +1,6 @@
 Name:		llvm
-Version:	10.0.1
-Release:        4
+Version:	12.0.1
+Release:        2
 Summary:	The Low Level Virtual Machine
 License:	NCSA
 URL:		http://llvm.org
@@ -8,7 +8,7 @@ Source0:	https://github.com/llvm/llvm-project/releases/download/llvmorg-%{versio
 
 BuildRequires:  gcc gcc-c++ cmake ninja-build zlib-devel libffi-devel ncurses-devel libstdc++-static
 BuildRequires:	python3-sphinx binutils-devel valgrind-devel libedit-devel python3-devel
-BuildRequires:  python3-recommonmark
+BuildRequires:  python3-recommonmark llvm-libs
 
 %description
 LLVM is a compiler infrastructure designed for compile-time, link-time,
@@ -66,7 +66,7 @@ cd _build
 	-DBUILD_SHARED_LIBS:BOOL=OFF \
 	-DLLVM_PARALLEL_LINK_JOBS=1 \
 	-DCMAKE_BUILD_TYPE=RelWithDebInfo \
-	-DCMAKE_INSTALL_RPATH=";" \
+	-DCMAKE_SKIP_RPATH:BOOL=ON \
 	-DCMAKE_C_FLAGS_RELWITHDEBINFO="%{optflags} -DNDEBUG" \
 	-DCMAKE_CXX_FLAGS_RELWITHDEBINFO="%{optflags} -DNDEBUG" \
 %if 0%{?__isa_bits} == 64
@@ -153,6 +153,10 @@ mkdir -p %{buildroot}%{_libdir}/%{name}
 cp -R _build/unittests %{buildroot}%{_libdir}/%{name}/
 find %{buildroot}%{_libdir}/%{name} -ignore_readdir_race -iname 'cmake*' -exec rm -Rf '{}' ';' || true
 
+#TODO: clang rust mesa packages will be unresolvable without this work-around
+cp -p %{_libdir}/libLLVM-10*.so %{buildroot}%{_libdir}
+cp -p %{_libdir}/libLTO.so.10 %{buildroot}%{_libdir}
+
 %check
 cd _build
 ninja check-all || :
@@ -198,6 +202,18 @@ fi
 %changelog
 * Wed Oct 15 2021 zhangweiguo <zhangweiguo2@huawei.com> - 10.0.1-4
 - Disabe DLLVM_BUILD_TEST
+
+* Mon Dec 13 2021 zoulin <zoulin13@huawei.com> - 12.0.1-1
+- Type: enhancement
+- ID: NA
+- SUG: NA
+- DESC: Update version to 12.0.1
+
+* Wed Sep 8 2021 zhangruifang <zhangruifang1@huawei.com> - 10.0.1-4
+- Type: enhancement
+- ID: NA
+- SUG: NA
+- DESC: Remove rpath
 
 * Wed Oct 14 2020 Hugel <gengqihu1@huawei.com> - 10.0.1-3
 - Type: enhancement
