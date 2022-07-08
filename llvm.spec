@@ -200,8 +200,11 @@ fi
 %{_mandir}/man1/*
 
 %changelog
-* Wed Oct 15 2021 zhangweiguo <zhangweiguo2@huawei.com> - 10.0.1-4
-- Disabe DLLVM_BUILD_TEST
+* Tue Feb 8 2022 zhangweiguo <zhangweiguo2@huawei.com> - 12.0.1-2
+- Type: enhancement
+- ID: NA
+- SUG: NA
+- DESC: Disabe DLLVM_BUILD_TEST
 
 * Mon Dec 13 2021 zoulin <zoulin13@huawei.com> - 12.0.1-1
 - Type: enhancement
