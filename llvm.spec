@@ -1,6 +1,6 @@
 Name:		llvm
 Version:	12.0.1
-Release:        3
+Release:        4
 Summary:	The Low Level Virtual Machine
 License:	NCSA
 URL:		http://llvm.org
@@ -9,6 +9,7 @@ Source0:	https://github.com/llvm/llvm-project/releases/download/llvmorg-%{versio
 BuildRequires:  gcc gcc-c++ cmake ninja-build zlib-devel libffi-devel ncurses-devel libstdc++-static
 BuildRequires:	python3-sphinx binutils-devel valgrind-devel libedit-devel python3-devel
 BuildRequires:  python3-recommonmark
+Patch0:     0001-Add-Matrix-multiplication-recognition-function.patch
 
 %description
 LLVM is a compiler infrastructure designed for compile-time, link-time,
@@ -196,6 +197,12 @@ fi
 %{_mandir}/man1/*
 
 %changelog
+* Mon Sep 19 2022 yuanshaobai <2659799534@qq.com> - 12.0.1-4
+- Type: enhancement
+- ID: NA
+- SUG: NA
+- DESC: Add Matrix multiplication recognition function
+
 * Tue Aug 23 2022 guopeilin <guopeilin1@huawei.com> - 12.0.1-3
 - Type: enhancement
 - ID: NA
