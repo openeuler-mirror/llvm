@@ -1,0 +1,624 @@
+From adcf3d52337966c46e56a737139a3607ef56be3f Mon Sep 17 00:00:00 2001
+From: yuanshaobai <2659799534@qq.com>
+Date: Mon, 19 Sep 2022 15:59:22 +0800
+Subject: [PATCH] Add Matrix multiplication recognition function
+
+---
+ clang/lib/CodeGen/CGMatrixInfo.cpp     | 315 +++++++++++++++++++++++++
+ clang/lib/CodeGen/CGMatrixInfo.h       |  19 ++
+ clang/lib/CodeGen/CGStmt.cpp           |  29 ++-
+ clang/lib/CodeGen/CMakeLists.txt       |   1 +
+ clang/test/CodeGen/Matrix-mult-ident.c | 171 ++++++++++++++
+ 5 files changed, 528 insertions(+), 7 deletions(-)
+ create mode 100644 clang/lib/CodeGen/CGMatrixInfo.cpp
+ create mode 100644 clang/lib/CodeGen/CGMatrixInfo.h
+ create mode 100644 clang/test/CodeGen/Matrix-mult-ident.c
+
+diff --git a/clang/lib/CodeGen/CGMatrixInfo.cpp b/clang/lib/CodeGen/CGMatrixInfo.cpp
+new file mode 100644
+index 000000000000..78855c405feb
+--- /dev/null
++++ b/clang/lib/CodeGen/CGMatrixInfo.cpp
+@@ -0,0 +1,315 @@
++//===--- CGMatrixInfo.cpp - Emit matrix info from Statements---===//
++#include "CGMatrixInfo.h"
++#include "queue"
++#include "clang/ASTMatchers/ASTMatchFinder.h"
++#include "clang/ASTMatchers/ASTMatchers.h"
++#include "clang/Frontend/FrontendActions.h"
++#include "clang/Tooling/CommonOptionsParser.h"
++#include "clang/Tooling/Tooling.h"
++#include "llvm/Support/CommandLine.h"
++#include <iostream>
++#include <memory>
++using namespace std;
++using namespace clang::tooling;
++using namespace llvm;
++using namespace clang;
++using namespace clang::ast_matchers;
++
++queue<string> MatrixMultInfo;
++
++// build an ASTmatcher to match matrix multiplication in AST.
++StatementMatcher MatrixMatcher =
++    forStmt(
++        hasIncrement(unaryOperator().bind("firstop")),
++        hasLoopInit(declStmt(hasSingleDecl(
++            varDecl(hasInitializer(integerLiteral().bind("firstvar1")))
++                .bind("firstvar")))),
++        hasCondition(binaryOperator(hasLHS(implicitCastExpr(
++                                        hasSourceExpression(declRefExpr()))),
++                                    hasRHS(integerLiteral().bind("firstvar2")))
++                         .bind("firstcondop")),
++        hasBody(compoundStmt(hasAnySubstatement(
++            forStmt(
++                hasIncrement(unaryOperator().bind("secondop")),
++                hasLoopInit(declStmt(hasSingleDecl(
++                    varDecl(hasInitializer(integerLiteral().bind("secondvar1")))
++                        .bind("secondvar")))),
++                hasCondition(
++                    binaryOperator(hasLHS(implicitCastExpr(
++                                       hasSourceExpression(declRefExpr()))),
++                                   hasRHS(integerLiteral().bind("secondvar2")))
++                        .bind("secondcondop")),
++                hasBody(compoundStmt(hasAnySubstatement(
++                    forStmt(
++                        hasIncrement(unaryOperator().bind("thirdop")),
++                        hasLoopInit(declStmt(hasSingleDecl(
++                            varDecl(hasInitializer(
++                                        integerLiteral().bind("thirdvar1")))
++                                .bind("thirdvar")))),
++                        hasCondition(
++                            binaryOperator(
++                                hasLHS(implicitCastExpr(
++                                    hasSourceExpression(declRefExpr()))),
++                                hasRHS(integerLiteral().bind("thirdvar2")))
++                                .bind("thirdcondop")),
++                        hasBody(compoundStmt(forEach(binaryOperator(forEachDescendant(
++                            binaryOperator(
++                                hasOperatorName("*"),
++                                hasLHS(implicitCastExpr(
++                                    hasSourceExpression(arraySubscriptExpr(
++                                        hasBase(implicitCastExpr(
++                                            hasSourceExpression(
++                                                arraySubscriptExpr(
++                                                    hasIndex(implicitCastExpr(
++                                                        hasSourceExpression(
++                                                            declRefExpr(to(
++                                                                varDecl().bind(
++                                                                    "MatrixAIdx"
++                                                                    "1")))))))))),
++                                        hasIndex(implicitCastExpr(
++                                            hasSourceExpression(declRefExpr(
++                                                declRefExpr(to(varDecl().bind(
++                                                    "MatrixAIdx2"))))))))))),
++                                hasRHS(implicitCastExpr(
++                                    hasSourceExpression(arraySubscriptExpr(
++                                        hasBase(implicitCastExpr(
++                                            hasSourceExpression(arraySubscriptExpr(
++                                                hasIndex(implicitCastExpr(
++                                                    hasSourceExpression(
++                                                        declRefExpr(declRefExpr(
++                                                            to(varDecl().bind(
++                                                                "MatrixBIdx"
++                                                                "1"))))))))))),
++                                        hasIndex(implicitCastExpr(
++                                            hasSourceExpression(declRefExpr(
++                                                declRefExpr(to(varDecl().bind(
++                                                    "MatrixBIdx2"))))))))))))
++                                .bind("operator")))))))
++                        .bind("thirdfor")))))
++                .bind("secondfor")))))
++        .bind("firstfor");
++
++// use run to judge whether it is amatrix multiplication and get matrix info.
++class MatrixIdent : public MatchFinder::MatchCallback {
++public:
++  virtual void run(const MatchFinder::MatchResult &Result) override {
++    isAMatrix = false;
++    // get AST nodes' info.
++    VarDecl const *MatrixAIdx1 = Result.Nodes.getNodeAs<VarDecl>("MatrixAIdx1");
++    VarDecl const *MatrixAIdx2 = Result.Nodes.getNodeAs<VarDecl>("MatrixAIdx2");
++    VarDecl const *MatrixBIdx1 = Result.Nodes.getNodeAs<VarDecl>("MatrixBIdx1");
++    VarDecl const *MatrixBIdx2 = Result.Nodes.getNodeAs<VarDecl>("MatrixBIdx2");
++    BinaryOperator const *FCondOp =
++        Result.Nodes.getNodeAs<BinaryOperator>("firstcondop");
++    BinaryOperator const *SCondOp =
++        Result.Nodes.getNodeAs<BinaryOperator>("secondcondop");
++    BinaryOperator const *TCondOp =
++        Result.Nodes.getNodeAs<BinaryOperator>("thirdcondop");
++    UnaryOperator const *FOp = Result.Nodes.getNodeAs<UnaryOperator>("firstop");
++    UnaryOperator const *SOp =
++        Result.Nodes.getNodeAs<UnaryOperator>("secondop");
++    UnaryOperator const *TOp = Result.Nodes.getNodeAs<UnaryOperator>("thirdop");
++    VarDecl const *FirstForCondVar =
++        Result.Nodes.getNodeAs<VarDecl>("firstvar");
++    VarDecl const *SecondForCondVar =
++        Result.Nodes.getNodeAs<VarDecl>("secondvar");
++    VarDecl const *ThirdForCondVar =
++        Result.Nodes.getNodeAs<VarDecl>("thirdvar");
++
++    // Judge whether it is a matrix multiplication, matrix parameters must
++    // cover circular index and matrix does not have two identical parameters.
++    bool isFirstvarEqual = false, isSecondvarEqual = false,
++         isThirdvarEqual = false;
++    string MA1, MA2, MB1, MB2, FName, SName, TName;
++    MA1 = MatrixAIdx1->getName().str();
++    MA2 = MatrixAIdx2->getName().str();
++    MB1 = MatrixBIdx1->getName().str();
++    MB2 = MatrixBIdx2->getName().str();
++    FName = FirstForCondVar->getName().str();
++    SName = SecondForCondVar->getName().str();
++    TName = ThirdForCondVar->getName().str();
++
++    if (FName == MA1 || FName == MA2 || FName == MB1 || FName == MB2)
++      isFirstvarEqual = true;
++    if (SName == MA1 || SName == MA2 || SName == MB1 || SName == MB2)
++      isSecondvarEqual = true;
++    if (TName == MA1 || TName == MA2 || TName == MB1 || TName == MB2)
++      isThirdvarEqual = true;
++
++    string FCondOpStr = FCondOp->getOpcodeStr().str();
++    string SCondOpStr = SCondOp->getOpcodeStr().str();
++    string TCondOpStr = TCondOp->getOpcodeStr().str();
++    string FOpStr = FOp->getOpcodeStr(FOp->getOpcode()).str();
++    string SOpStr = SOp->getOpcodeStr(SOp->getOpcode()).str();
++    string TOpStr = TOp->getOpcodeStr(TOp->getOpcode()).str();
++
++    if (isFirstvarEqual && isSecondvarEqual && isThirdvarEqual && MA1 != MA2 &&
++        MB1 != MB2) {
++      if ((FCondOpStr == "<" && FOpStr == "++") ||
++          (FCondOpStr == ">" && FOpStr == "--"))
++        if ((SCondOpStr == "<" && SOpStr == "++") ||
++            (SCondOpStr == ">" && SOpStr == "--"))
++          if ((TCondOpStr == "<" && TOpStr == "++") ||
++              (TCondOpStr == ">" && TOpStr == "--"))
++            isAMatrix = true;
++    }
++    // If there is a matrix multiplication, use matrix parameters and circular
++    // index to get info.
++    if (isAMatrix == true) {
++      bool aTranspose = false, bTranspose = false;
++
++      int aRows = 0, bRows = 0, aColumns = 0, bColumns = 0;
++
++      IntegerLiteral const *FirstVar1_ =
++          Result.Nodes.getNodeAs<IntegerLiteral>("firstvar1");
++      IntegerLiteral const *FirstVar2_ =
++          Result.Nodes.getNodeAs<IntegerLiteral>("firstvar2");
++      IntegerLiteral const *SecondVar1_ =
++          Result.Nodes.getNodeAs<IntegerLiteral>("secondvar1");
++      IntegerLiteral const *SecondVar2_ =
++          Result.Nodes.getNodeAs<IntegerLiteral>("secondvar2");
++      IntegerLiteral const *ThirdVar1_ =
++          Result.Nodes.getNodeAs<IntegerLiteral>("thirdvar1");
++      IntegerLiteral const *ThirdVar2_ =
++          Result.Nodes.getNodeAs<IntegerLiteral>("thirdvar2");
++
++      if (MA2 == MB1) {
++        aTranspose = false;
++        bTranspose = false;
++      }
++      if (MA2 == MB2) {
++        aTranspose = false;
++        bTranspose = true;
++      }
++      if (MA1 == MB1) {
++        aTranspose = true;
++        bTranspose = false;
++      }
++      if (MA1 == MB2) {
++        aTranspose = true;
++        bTranspose = true;
++      }
++
++      int FirstVar1 = FirstVar1_->getValue().getSExtValue();
++      int FirstVar2 = FirstVar2_->getValue().getSExtValue();
++      int SecondVar1 = SecondVar1_->getValue().getSExtValue();
++      int SecondVar2 = SecondVar2_->getValue().getSExtValue();
++      int ThirdVar1 = ThirdVar1_->getValue().getSExtValue();
++      int ThirdVar2 = ThirdVar2_->getValue().getSExtValue();
++
++      int FEqual = 1;
++      int SEqual = 1;
++      int TEqual = 1;
++
++      if (FOpStr == "--")
++        FEqual = -1;
++      if (SOpStr == "--")
++        SEqual = -1;
++      if (TOpStr == "--")
++        TEqual = -1;
++
++      if (MA1 == FName)
++        aRows = (FirstVar2 - FirstVar1) * FEqual;
++      if (MA1 == SName)
++        aRows = (SecondVar2 - SecondVar1) * SEqual;
++      if (MA1 == TName)
++        aRows = (ThirdVar2 - ThirdVar1) * TEqual;
++      if (MA2 == FName)
++        aColumns = (FirstVar2 - FirstVar1) * FEqual;
++      if (MA2 == SName)
++        aColumns = (SecondVar2 - SecondVar1) * SEqual;
++      if (MA2 == TName)
++        aColumns = (ThirdVar2 - ThirdVar1) * TEqual;
++      if (MB1 == FName)
++        bRows = (FirstVar2 - FirstVar1) * FEqual;
++      if (MB1 == SName)
++        bRows = (SecondVar2 - SecondVar1) * SEqual;
++      if (MB1 == TName)
++        bRows = (ThirdVar2 - ThirdVar1) * TEqual;
++      ;
++      if (MB2 == FName)
++        bColumns = (FirstVar2 - FirstVar1) * FEqual;
++      if (MB2 == SName)
++        bColumns = (SecondVar2 - SecondVar1) * SEqual;
++      ;
++      if (MB2 == TName)
++        bColumns = (ThirdVar2 - ThirdVar1) * TEqual;
++
++      int t = 0;
++      if (aTranspose == true) {
++        t = aRows;
++        aRows = aColumns;
++        aColumns = t;
++      }
++      if (bTranspose == true) {
++        t = bRows;
++        bRows = bColumns;
++        bColumns = t;
++      }
++      setMetadataInfo(aRows, aColumns, bRows, bColumns, aTranspose, bTranspose);
++      setInfo();
++    }
++  }
++
++  bool isMatrix() { return isAMatrix; }
++
++  void setInfo() {
++    string s = "ARows:";
++    string b = to_string(ARows);
++    s = s + b;
++    b = " AColumns:";
++    s = s + b;
++    b = to_string(AColumns);
++    s = s + b;
++    b = " ATranspose:";
++    s = s + b;
++    b = to_string(ATranspose);
++    s = s + b;
++    b = " BRows:";
++    s = s + b;
++    b = to_string(BRows);
++    s = s + b;
++    b = " BColumns:";
++    s = s + b;
++    b = to_string(BColumns);
++    s = s + b;
++    b = " BTranspose:";
++    s = s + b;
++    b = to_string(BTranspose);
++    s = s + b;
++    MatrixMultInfo.push(s);
++  }
++
++private:
++  int ARows, BRows, AColumns, BColumns;
++  bool ATranspose, BTranspose;
++  bool isAMatrix = false;
++  void setMetadataInfo(int aRows, int aColumns, int bRows, int bColumns,
++                       bool aTranspose, bool bTranspose) {
++    ARows = aRows;
++    BRows = bRows;
++    AColumns = aColumns;
++    BColumns = bColumns;
++    ATranspose = aTranspose;
++    BTranspose = bTranspose;
++  }
++};
++
++std::string MatrixIdentAction::getInfo() {
++  s = MatrixMultInfo.front();
++  MatrixMultInfo.pop();
++  return s;
++}
++
++bool MatrixIdentAction::isInfoQueueEmpty() { return MatrixMultInfo.empty(); }
++
++void MatrixIdentAction::MatrixMultIdent(const clang::ForStmt &S,
++                                        clang::ASTContext &act) {
++
++  MatchFinder Finder;
++  MatrixIdent matrixident;
++  Finder.addDynamicMatcher(MatrixMatcher, &matrixident);
++  Finder.match(S, act);
++  if (matrixident.isMatrix())
++    hasMatrix = true;
++}
+diff --git a/clang/lib/CodeGen/CGMatrixInfo.h b/clang/lib/CodeGen/CGMatrixInfo.h
+new file mode 100644
+index 000000000000..d3be21634643
+--- /dev/null
++++ b/clang/lib/CodeGen/CGMatrixInfo.h
+@@ -0,0 +1,19 @@
++#include "clang/AST/Stmt.h"
++#include "clang/ASTMatchers/ASTMatchers.h"
++#include "clang/ASTMatchers/ASTMatchFinder.h"
++#include "iostream"
++
++class MatrixIdentAction{
++public:
++    void MatrixMultIdent(const clang::ForStmt & S,clang::ASTContext & act);
++    bool getIfhasMatrix(){
++        return hasMatrix;
++    }
++    std::string getInfo();
++    void setInfo(std::string s1);
++    bool isInfoQueueEmpty();
++
++private:
++    bool hasMatrix = false;
++    std::string s;
++};
+diff --git a/clang/lib/CodeGen/CGStmt.cpp b/clang/lib/CodeGen/CGStmt.cpp
+index df7e5608f8f0..b4afd79611d7 100644
+--- a/clang/lib/CodeGen/CGStmt.cpp
++++ b/clang/lib/CodeGen/CGStmt.cpp
+@@ -11,6 +11,7 @@
+ //===----------------------------------------------------------------------===//
+ 
+ #include "CGDebugInfo.h"
++#include "CGMatrixInfo.h"
+ #include "CGOpenMPRuntime.h"
+ #include "CodeGenFunction.h"
+ #include "CodeGenModule.h"
+@@ -39,7 +40,7 @@ using namespace CodeGen;
+ //===----------------------------------------------------------------------===//
+ //                              Statement Emission
+ //===----------------------------------------------------------------------===//
+-
++int setmetadata_count = 0;
+ void CodeGenFunction::EmitStopPoint(const Stmt *S) {
+   if (CGDebugInfo *DI = getDebugInfo()) {
+     SourceLocation Loc;
+@@ -1015,20 +1016,35 @@ void CodeGenFunction::EmitDoStmt(const DoStmt &S,
+ void CodeGenFunction::EmitForStmt(const ForStmt &S,
+                                   ArrayRef<const Attr *> ForAttrs) {
+   JumpDest LoopExit = getJumpDestInCurrentScope("for.end");
+-
+-  LexicalScope ForScope(*this, S.getSourceRange());
+-
++  //start matrix multiplication recognition when EmitForStmt.
++  ASTContext &act = CGM.getContext();
++  MatrixIdentAction Maction;
++  Maction.MatrixMultIdent(S,act);
++  LexicalScope ForScope(*this, S.getSourceRange());    
+   // Evaluate the first part before the loop.
+   if (S.getInit())
+     EmitStmt(S.getInit());
+-
+   // Start the loop with a block that tests the condition.
+   // If there's an increment, the continue scope will be overwritten
+   // later.
+   JumpDest CondDest = getJumpDestInCurrentScope("for.cond");
+   llvm::BasicBlock *CondBlock = CondDest.getBlock();
+   EmitBlock(CondBlock);
+-
++  //If there is a matrix multiplication, set matrix-info to LLVM metaadata.
++  if(Maction.getIfhasMatrix()){
++    while(!Maction.isInfoQueueEmpty()){
++      std::string metadata_name = "MatrixMultIdent";
++      setmetadata_count++;
++      metadata_name = metadata_name+std::to_string(setmetadata_count);
++      llvm::LLVMContext & lct =CGM.getLLVMContext();
++      std::string s = Maction.getInfo();
++      s += " identNum:";
++      s += std::to_string(setmetadata_count);
++      llvm::MDNode * N = llvm::MDNode::get(lct, llvm::MDString::get(lct, s));
++      llvm::Function * F = CondBlock->getParent();
++      F->setMetadata(metadata_name, N);
++      }
++  }
+   Expr::EvalResult Result;
+   bool CondIsConstInt =
+       !S.getCond() || S.getCond()->EvaluateAsInt(Result, getContext());
+@@ -1076,7 +1092,6 @@ void CodeGenFunction::EmitForStmt(const ForStmt &S,
+ 
+     // As long as the condition is true, iterate the loop.
+     llvm::BasicBlock *ForBody = createBasicBlock("for.body");
+-
+     // C99 6.8.5p2/p4: The first substatement is executed if the expression
+     // compares unequal to 0.  The condition must be a scalar type.
+     llvm::Value *BoolCondVal = EvaluateExprAsBool(S.getCond());
+diff --git a/clang/lib/CodeGen/CMakeLists.txt b/clang/lib/CodeGen/CMakeLists.txt
+index 0bb5abcf6045..41a2827e6a9f 100644
+--- a/clang/lib/CodeGen/CMakeLists.txt
++++ b/clang/lib/CodeGen/CMakeLists.txt
+@@ -63,6 +63,7 @@ add_clang_library(clangCodeGen
+   CGOpenMPRuntimeGPU.cpp
+   CGRecordLayoutBuilder.cpp
+   CGStmt.cpp
++  CGMatrixInfo.cpp
+   CGStmtOpenMP.cpp
+   CGVTT.cpp
+   CGVTables.cpp
+diff --git a/clang/test/CodeGen/Matrix-mult-ident.c b/clang/test/CodeGen/Matrix-mult-ident.c
+new file mode 100644
+index 000000000000..04d92254b094
+--- /dev/null
++++ b/clang/test/CodeGen/Matrix-mult-ident.c
+@@ -0,0 +1,171 @@
++// RUN: %clang_cc1 -emit-llvm -debug-info-kind=limited -I%p %s -o - | FileCheck %s
++
++void testfoo()
++{
++    int A[3][3]={1,2,3,4,5,6,7,8,9};
++    int B[3][3]={1,2,3,4,5,6,7,8,9};
++    int C[3][3];
++    int D[3][3];
++    //Examples of four transpositions.
++    for (int m = 0; m < 3; m++) {
++      for (int n = 0; n < 3; n++) {
++        C[m][n] = 0;
++        for (int k = 0; k < 3; k++) {
++          C[m][n] += A[m][k] * B[k][n];
++        }
++      }
++    }
++//CHECK: !{!"ARows:3 AColumns:3 ATranspose:0 BRows:3 BColumns:3 BTranspose:0 identNum:1"}
++
++    for (int m = 0; m < 3; m++) {
++      for (int n = 0; n < 3; n++) {
++        C[m][n] = 0;
++        for (int k = 0; k < 3; k++) {
++          C[m][n] += A[k][m] * B[k][n];
++        }
++      }
++    }
++//CHECK: !{!"ARows:3 AColumns:3 ATranspose:1 BRows:3 BColumns:3 BTranspose:0 identNum:2"}
++    for (int m = 0; m < 3; m++) {
++      for (int n = 0; n < 3; n++) {
++        C[m][n] = 0;
++        for (int k = 0; k < 3; k++) {
++          C[m][n] += A[m][k] * B[n][k];
++        }
++      }
++    }
++//CHECK: !{!"ARows:3 AColumns:3 ATranspose:0 BRows:3 BColumns:3 BTranspose:1 identNum:3"}
++    for (int m = 0; m < 3; m++) {
++      for (int n = 0; n < 3; n++) {
++        C[m][n] = 0;
++        for (int k = 0; k < 3; k++) {
++          C[m][n] += A[k][m] * B[n][k];
++        }
++      }
++    }
++//CHECK: !{!"ARows:3 AColumns:3 ATranspose:1 BRows:3 BColumns:3 BTranspose:1 identNum:4"}
++    //Unequal matrix of row number and column numbe.
++    for (int m = 0; m < 3; m++) {
++      for (int n = 0; n < 2; n++) {
++        C[m][n] = 0;
++        for (int k = 0; k < 1; k++) {
++          C[m][n] += A[k][m] * B[n][k];
++        }
++      }
++    }
++//CHECK: !{!"ARows:3 AColumns:1 ATranspose:1 BRows:1 BColumns:2 BTranspose:1 identNum:5"}
++    //Unequal matrix of row number and column numbe, loop exchange.
++    for (int n = 0; n < 3; n++) {
++      for (int k = 0; k < 2; k++) {
++        C[n][k] = 0;
++        for (int m = 0; m < 1; m++) {
++          C[m][n] += A[k][m] * B[n][k];
++        }
++      }
++    }
++//CHECK: !{!"ARows:1 AColumns:2 ATranspose:1 BRows:2 BColumns:3 BTranspose:1 identNum:6"}
++
++    //compound operation.
++    for (int m = 0; m < 3; m++) {
++      for (int n = 0; n < 3; n++) {
++        D[m][n] = 3*C[m][n];
++        for (int k = 0; k < 3; k++) {
++          D[m][n] += 2*(A[m][k] * B[k][n]);
++        }
++      }
++    }
++//CHECK: !{!"ARows:3 AColumns:3 ATranspose:0 BRows:3 BColumns:3 BTranspose:0 identNum:7"}
++    //compound operation, “--” Symbol recognition
++    for (int m = 2; m > 0; m--) {
++      for (int n = 2; n > 0; n--) {
++        D[m][n] = 3*C[m][n];
++        for (int k = 0; k < 3; k++) {
++          D[m][n] += 2*(A[m][k] * B[k][n]);
++        }
++      }
++    }
++//CHECK: !{!"ARows:2 AColumns:3 ATranspose:0 BRows:3 BColumns:2 BTranspose:0 identNum:8"}
++    //Multiple matrix multiplication in Triple Cycle.
++    for (int m = 0; m < 3; m++) {
++      for (int n = 0; n < 3; n++) {
++        C[m][n] = 0;
++        for (int k = 0; k < 3; k++) {
++          C[m][n] += A[m][k] * B[k][n];
++            C[m][n] += A[m][k] * B[k][n];
++        }
++      }
++    }
++//CHECK: !{!"ARows:3 AColumns:3 ATranspose:0 BRows:3 BColumns:3 BTranspose:0 identNum:9"}
++//CHECK: !{!"ARows:3 AColumns:3 ATranspose:0 BRows:3 BColumns:3 BTranspose:0 identNum:10"}
++    //Multiple matrix multiplication in a formula.
++    for (int m = 0; m < 3; m++) {
++      for (int n = 0; n < 3; n++) {
++        C[m][n] = 0;
++        for (int k = 0; k < 3; k++) {
++          C[m][n] += A[m][k] * B[k][n]+A[m][k] * B[k][n];
++        }
++      }
++    }
++//CHECK: !{!"ARows:3 AColumns:3 ATranspose:0 BRows:3 BColumns:3 BTranspose:0 identNum:11"}
++//CHECK: !{!"ARows:3 AColumns:3 ATranspose:0 BRows:3 BColumns:3 BTranspose:0 identNum:12"}
++    //Example of loop index error.
++    for (int m = 2; m > 0; m--) {
++      for (int n = 2; n > 0; n--) {
++        D[m][n] = 3*C[m][n];
++        for (int k = 0; k < 3; k++) {
++          D[m][n] += 2*(A[m][m] * B[k][n]);
++        }
++      }
++    }
++    //Example of matrix parameters error.
++    for (int m = 0; m < 3; m++) {
++      for (int n = 0; n < 3; n++) {
++        C[m][n] = 0;
++        for (int g = 0; g < 3; g++) {
++            int k;
++          C[m][n] += A[k][m] * B[n][k];
++        }
++      }
++    }
++    //Example of too many loops.
++    for (int m = 0; m < 3; m++) {
++    for (int j = 0; j < 3; j++)
++      for (int n = 0; n < 3; n++) {
++        C[m][n] = 0;
++        for (int k = 0; k < 3; k++) {
++          C[m][n] += A[k][m] * B[n][k];
++        }
++      }
++    }
++
++    for (int m = 0; m < 3; m++) {
++      for (int n = 0; n < 3; n++) {
++        C[m][n] = 0;
++        for (int k = 0; k < 3; k++)
++            for (int j = 0; j < 3; j++){
++          C[m][n] += A[k][m] * B[n][k];
++        }
++      }
++    }
++
++    for (int m = 0; m < 3; m++) {
++      for (int n = 0; n < 3; n++) {
++        C[m][n] = 0;
++          for (int j = 0; j < 3; j++)
++        for (int k = 0; k < 3; k++) {
++          C[m][n] += A[k][m] * B[n][k];
++        }
++      }
++    }
++    //If the redundant loop is above the triple loop, It can be identified as matrix multiplication.
++    for (int j = 0; j < 3; j++)
++    for (int m = 0; m < 3; m++) {
++      for (int n = 0; n < 3; n++) {
++        C[m][n] = 0;
++        for (int k = 0; k < 3; k++) {
++          C[m][n] += A[k][m] * B[n][k];
++        }
++      }
++    }
++//CHECK !{!"ARows:3 AColumns:3 ATranspose:1 BRows:3 BColumns:3 BTranspose:1 identNum:13"}
++}
+-- 
+2.32.1 (Apple Git-133)
+
