@@ -1,10 +1,12 @@
 Name:		llvm
 Version:	12.0.1
-Release:        2
+Release:        3
 Summary:	The Low Level Virtual Machine
 License:	NCSA
 URL:		http://llvm.org
 Source0:	https://github.com/llvm/llvm-project/releases/download/llvmorg-%{version}/%{name}-%{version}.src.tar.xz
+
+Patch1:   0001-Add-LoongArch-support.patch
 
 BuildRequires:  gcc gcc-c++ cmake ninja-build zlib-devel libffi-devel ncurses-devel libstdc++-static
 BuildRequires:	python3-sphinx binutils-devel valgrind-devel libedit-devel python3-devel
@@ -196,6 +198,12 @@ fi
 %{_mandir}/man1/*
 
 %changelog
+* Thu Sep 22 2022 wanglei <wanglei@loongson.cn> - 12.0.1-3
+- Type: enhancement
+- ID: NA
+- SUG: NA
+- DESC: Add LoongArch support
+
 * Tue Feb 22 2022 wangjie <wangjie375@h-partners.com> - 12.0.1-2
 - Type: enhancement
 - ID: NA
