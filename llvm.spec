@@ -1,6 +1,6 @@
 Name:		llvm
 Version:	12.0.1
-Release:        2
+Release:        3
 Summary:	The Low Level Virtual Machine
 License:	NCSA
 URL:		http://llvm.org
@@ -96,7 +96,7 @@ cd _build
 	-DLLVM_INCLUDE_TOOLS:BOOL=ON \
 	-DLLVM_BUILD_TOOLS:BOOL=ON \
 	-DLLVM_INCLUDE_TESTS:BOOL=ON \
-	-DLLVM_BUILD_TESTS:BOOL=ON \
+	-DLLVM_BUILD_TESTS:BOOL=OFF \
 	-DLLVM_INCLUDE_EXAMPLES:BOOL=ON \
 	-DLLVM_BUILD_EXAMPLES:BOOL=OFF \
 	-DLLVM_INCLUDE_UTILS:BOOL=ON \
@@ -196,6 +196,12 @@ fi
 %{_mandir}/man1/*
 
 %changelog
+* Tue Nov 1 2022 zhangruifang <zhangruifang1@h-partners.com> - 12.0.1-3
+- Type: enhancement
+- ID: NA
+- SUG: NA
+- DESC: Disabe DLLVM_BUILD_TEST
+
 * Tue Feb 22 2022 wangjie <wangjie375@h-partners.com> - 12.0.1-2
 - Type: enhancement
 - ID: NA
