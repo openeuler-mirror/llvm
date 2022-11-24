@@ -1,13 +1,17 @@
 Name:		llvm
-Version:	12.0.1
-Release:        3
+Version:	13.0.1
+Release:        1
 Summary:	The Low Level Virtual Machine
 License:	NCSA
 URL:		http://llvm.org
 Source0:	https://github.com/llvm/llvm-project/releases/download/llvmorg-%{version}/%{name}-%{version}.src.tar.xz
 
 BuildRequires:  gcc gcc-c++ cmake ninja-build zlib-devel libffi-devel ncurses-devel libstdc++-static
-BuildRequires:	python3-sphinx binutils-devel valgrind-devel libedit-devel python3-devel
+
+%ifarch %{valgrind_arches}
+BuildRequires: valgrind-devel
+%endif
+BuildRequires:	python3-sphinx binutils-devel libedit-devel python3-devel
 BuildRequires:  python3-recommonmark
 
 %description
@@ -196,6 +200,12 @@ fi
 %{_mandir}/man1/*
 
 %changelog
+* Tue Nov 29 2022 jchzhou <jchzhou@outlook.com> - 13.0.1-1
+- Type: enhancement
+- ID: NA
+- SUG: NA
+- DESC: Update to 13.0.1
+
 * Tue Aug 23 2022 guopeilin <guopeilin1@huawei.com> - 12.0.1-3
 - Type: enhancement
 - ID: NA
