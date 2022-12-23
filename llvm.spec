@@ -1,6 +1,6 @@
 Name:		llvm
 Version:	12.0.1
-Release:        3
+Release:        4
 Summary:	The Low Level Virtual Machine
 License:	NCSA
 URL:		http://llvm.org
@@ -67,8 +67,9 @@ cd _build
 	-DLLVM_PARALLEL_LINK_JOBS=1 \
 	-DCMAKE_BUILD_TYPE=RelWithDebInfo \
 	-DCMAKE_SKIP_RPATH:BOOL=ON \
-	-DCMAKE_C_FLAGS_RELWITHDEBINFO="%{optflags} -DNDEBUG" \
-	-DCMAKE_CXX_FLAGS_RELWITHDEBINFO="%{optflags} -DNDEBUG" \
+	-DCMAKE_C_FLAGS_RELWITHDEBINFO="%{optflags} -DNDEBUG -fPIE -fPIC" \
+	-DCMAKE_CXX_FLAGS_RELWITHDEBINFO="%{optflags} -DNDEBUG -fPIE -fPIC" \
+	-DCMAKE_EXE_LINKER_FLAGS_RELWITHDEBINFO="%{optflags} -pie" \
 %if 0%{?__isa_bits} == 64
 	-DLLVM_LIBDIR_SUFFIX=64 \
 %else
@@ -196,6 +197,12 @@ fi
 %{_mandir}/man1/*
 
 %changelog
+* Wed Dec 21 2022 eastb233 <xiezhiheng@huawei.com> - 12.0.1-4
+- Type: Compile Option
+- ID: NA
+- SUG: NA
+- DESC: Add -fPIE and -pie options
+
 * Tue Nov 1 2022 zhangruifang <zhangruifang1@h-partners.com> - 12.0.1-3
 - Type: enhancement
 - ID: NA
