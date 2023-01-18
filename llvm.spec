@@ -1,5 +1,5 @@
 Name:		llvm
-Version:	13.0.1
+Version:	14.0.5
 Release:        1
 Summary:	The Low Level Virtual Machine
 License:	NCSA
@@ -119,7 +119,8 @@ cd _build
 	-DLLVM_INSTALL_TOOLCHAIN_ONLY:BOOL=OFF \
 	-DSPHINX_WARNINGS_AS_ERRORS=OFF \
 	-DLLVM_INSTALL_SPHINX_HTML_DIR=%{_pkgdocdir}/html \
-	-DSPHINX_EXECUTABLE=%{_bindir}/sphinx-build-3
+	-DSPHINX_EXECUTABLE=%{_bindir}/sphinx-build-3 \
+	-DLLVM_INCLUDE_BENCHMARKS=OFF
 
 %ninja_build LLVM
 %ninja_build
@@ -200,7 +201,13 @@ fi
 %{_mandir}/man1/*
 
 %changelog
-* Tue Nov 29 2022 jchzhou <jchzhou@outlook.com> - 13.0.1-1
+* Sun Jul 10 2022 jchzhou <zhoujiacheng@iscas.ac.cn> - 14.0.5-1
+- Type: enhancement
+- ID: NA
+- SUG: NA
+- DESC: Update version to 14.0.5, remove obsolete patch
+
+* Tue Nov 29 2022 jchzhou <zhoujiacheng@iscas.ac.cn> - 13.0.1-1
 - Type: enhancement
 - ID: NA
 - SUG: NA
