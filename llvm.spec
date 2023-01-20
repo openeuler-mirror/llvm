@@ -1,10 +1,12 @@
 Name:		llvm
-Version:	13.0.1
+Version:	15.0.7
 Release:        1
 Summary:	The Low Level Virtual Machine
 License:	NCSA
 URL:		http://llvm.org
 Source0:	https://github.com/llvm/llvm-project/releases/download/llvmorg-%{version}/%{name}-%{version}.src.tar.xz
+Source1:	https://github.com/llvm/llvm-project/releases/download/llvmorg-%{version}/cmake-%{version}.src.tar.xz
+
 
 BuildRequires:  gcc gcc-c++ cmake ninja-build zlib-devel libffi-devel ncurses-devel libstdc++-static
 
@@ -57,6 +59,9 @@ Obsoletes:      %{name}-doc < %{version}-%{release}
 The %{name}-help package contains doc files for %{name}.
 
 %prep
+%setup -T -q -b 1 -n cmake-%{version}.src
+cd ..
+mv cmake-%{version}.src cmake
 %autosetup -n %{name}-%{version}.src -p1
 pathfix.py -i %{__python3} -pn test/BugPoint/compile-custom.ll.py tools/opt-viewer/*.py
 
@@ -119,7 +124,8 @@ cd _build
 	-DLLVM_INSTALL_TOOLCHAIN_ONLY:BOOL=OFF \
 	-DSPHINX_WARNINGS_AS_ERRORS=OFF \
 	-DLLVM_INSTALL_SPHINX_HTML_DIR=%{_pkgdocdir}/html \
-	-DSPHINX_EXECUTABLE=%{_bindir}/sphinx-build-3
+	-DSPHINX_EXECUTABLE=%{_bindir}/sphinx-build-3 \
+	-DLLVM_INCLUDE_BENCHMARKS=OFF
 
 %ninja_build LLVM
 %ninja_build
@@ -133,6 +139,9 @@ mv -v %{buildroot}%{_bindir}/llvm-config{,-%{__isa_bits}}
 for f in llvm-isel-fuzzer llvm-opt-fuzzer; do
 install -m 0755 ./_build/bin/$f %{buildroot}%{_bindir}
 done
+
+# Remove testing of update utility tools
+rm -rf test/tools/UpdateTestChecks
 
 %global install_srcdir %{buildroot}%{_datadir}/llvm/src
 %global lit_cfg test/lit.site.cfg.py
@@ -156,6 +165,8 @@ tar -czf %{install_srcdir}/test.tar.gz test/
 mkdir -p %{buildroot}%{_libdir}/%{name}
 cp -R _build/unittests %{buildroot}%{_libdir}/%{name}/
 find %{buildroot}%{_libdir}/%{name} -ignore_readdir_race -iname 'cmake*' -exec rm -Rf '{}' ';' || true
+
+cp -Rv ../cmake/Modules/* %{buildroot}%{_libdir}/cmake/llvm
 
 %check
 cd _build
@@ -200,7 +211,19 @@ fi
 %{_mandir}/man1/*
 
 %changelog
-* Tue Nov 29 2022 jchzhou <jchzhou@outlook.com> - 13.0.1-1
+* Thu Jan 12 2023 jchzhou <zhoujiacheng@iscas.ac.cn> - 15.0.7-1
+- Type: enhancement
+- ID: NA
+- SUG: NA
+- DESC: Update version to 15.0.7
+
+* Sun Jul 10 2022 jchzhou <zhoujiacheng@iscas.ac.cn> - 14.0.5-1
+- Type: enhancement
+- ID: NA
+- SUG: NA
+- DESC: Update version to 14.0.5, remove obsolete patch
+
+* Tue Nov 29 2022 jchzhou <zhoujiacheng@iscas.ac.cn> - 13.0.1-1
 - Type: enhancement
 - ID: NA
 - SUG: NA
