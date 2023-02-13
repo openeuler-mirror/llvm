@@ -1,6 +1,8 @@
+%bcond_with check
+
 Name:		llvm
 Version:	12.0.1
-Release:        4
+Release:	5
 Summary:	The Low Level Virtual Machine
 License:	NCSA
 URL:		http://llvm.org
@@ -155,8 +157,10 @@ cp -R _build/unittests %{buildroot}%{_libdir}/%{name}/
 find %{buildroot}%{_libdir}/%{name} -ignore_readdir_race -iname 'cmake*' -exec rm -Rf '{}' ';' || true
 
 %check
+%if %{with check}
 cd _build
 ninja check-all || :
+%endif
 
 %post -p /sbin/ldconfig
 %postun -p /sbin/ldconfig
@@ -197,6 +201,10 @@ fi
 %{_mandir}/man1/*
 
 %changelog
+* Tue Feb 14 2023 cf-zhao <zhaochuanfeng@huawei.com> - 12.0.1-5
+- Disable check temporarily to avoid a build error that `rmbuild` cannot
+- remove a file due to no permission.
+
 * Wed Dec 21 2022 eastb233 <xiezhiheng@huawei.com> - 12.0.1-4
 - Type: Compile Option
 - ID: NA
