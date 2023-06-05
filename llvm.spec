@@ -1,124 +1,180 @@
-%bcond_with check
+%bcond_without sys_llvm
+%bcond_without check
 
-Name:		llvm
-Version:	12.0.1
-Release:	5
+%global maj_ver 15
+%global min_ver 0
+%global patch_ver 7
+
+%if %{with sys_llvm}
+%global pkg_name llvm
+%global bin_suffix %{nil}
+%global install_prefix %{_prefix}
+%else
+%global pkg_name llvm%{maj_ver}
+%global bin_suffix -%{maj_ver}
+%global install_prefix %{_libdir}/%{name}
+%endif
+
+%global install_bindir %{install_prefix}/bin
+%global install_includedir %{install_prefix}/include
+%global install_libdir %{install_prefix}/lib
+%global install_srcdir %{install_prefix}/src
+
+%global pkg_bindir %{install_bindir}
+%global pkg_includedir %{install_includedir}
+%global pkg_libdir %{install_libdir}
+%global pkg_srcdir %{install_srcdir}
+
+%global max_link_jobs 2
+%global targets_to_build "all"
+%global experimental_targets_to_build ""
+
+%global build_install_prefix %{buildroot}%{install_prefix}
+%global llvm_triple %{_host}
+
+Name:		%{pkg_name}
+Version:	%{maj_ver}.%{min_ver}.%{patch_ver}
+Release:	2
 Summary:	The Low Level Virtual Machine
+
 License:	NCSA
 URL:		http://llvm.org
-Source0:	https://github.com/llvm/llvm-project/releases/download/llvmorg-%{version}/%{name}-%{version}.src.tar.xz
+Source0:	https://github.com/llvm/llvm-project/releases/download/llvmorg-%{version}/llvm-%{version}.src.tar.xz
+Source1:	https://github.com/llvm/llvm-project/releases/download/llvmorg-%{version}/cmake-%{version}.src.tar.xz
 
-BuildRequires:  gcc gcc-c++ cmake ninja-build zlib-devel libffi-devel ncurses-devel libstdc++-static
-BuildRequires:	python3-sphinx binutils-devel valgrind-devel libedit-devel python3-devel
-BuildRequires:  python3-recommonmark
+BuildRequires:	binutils-devel
+BuildRequires:	cmake
+BuildRequires:	gcc
+BuildRequires:	gcc-c++
+BuildRequires:	libedit-devel
+BuildRequires:	libffi-devel
+BuildRequires:	multilib-rpm-config
+BuildRequires:	ncurses-devel
+BuildRequires:	ninja-build
+BuildRequires:	python3-devel
+BuildRequires:	python3-psutil
+BuildRequires:	python3-recommonmark
+BuildRequires:	python3-sphinx
+BuildRequires:	python3-setuptools
+BuildRequires:	zlib-devel
+
+Requires:	%{name}-libs%{?_isa} = %{version}-%{release}
+
+Provides:	llvm(major) = %{maj_ver}
 
 %description
 LLVM is a compiler infrastructure designed for compile-time, link-time,
 runtime, and idle-time optimization of programs from arbitrary programming
-languages.
+languages. The compiler infrastructure includes mirror sets of programming
+tools as well as libraries with equivalent functionality.
 
-The LLVM compiler infrastructure supports a wide range of projects,
-from industrial strength compilers to specialized JIT applications
-to small research projects.
+%package devel
+Summary:	Libraries and header files for LLVM
+Requires:	%{name}%{?_isa} = %{version}-%{release}
+Requires:	%{name}-libs%{?_isa} = %{version}-%{release}
+Requires:	libedit-devel
+Requires:	%{name}-static%{?_isa} = %{version}-%{release}
+
+Requires(post):	%{_sbindir}/alternatives
+Requires(postun):	%{_sbindir}/alternatives
+
+Provides:	llvm-devel(major) = %{maj_ver}
+
+%description devel
+This package contains library and header files needed to develop new native
+programs that use the LLVM infrastructure.
+
+%package doc
+Summary:	Documentation for LLVM
+BuildArch:	noarch
+Requires:	%{name} = %{version}-%{release}
+
+%description doc
+Documentation for the LLVM compiler infrastructure.
 
 %package libs
-Summary:LLVM shared libraries
+Summary:	LLVM shared libraries
 
 %description libs
 Shared libraries for the LLVM compiler infrastructure.
 
-%package        devel
-Summary:        Development files for %{name}
-Requires:       %{name} = %{version}-%{release}
-Requires:       libedit-devel python3-lit binutils gcc
-Requires(post):  %{_sbindir}/alternatives
-Requires(postun):%{_sbindir}/alternatives
-Provides:       %{name}-static = %{version}-%{release}
-Obsoletes:      %{name}-static < %{version}-%{release}
-Provides:       %{name}-googletest = %{version}-%{release}
-Obsoletes:      %{name}-googletest < %{version}-%{release}
-Provides:       %{name}-test = %{version}-%{release}
-Obsoletes:      %{name}-test < %{version}-%{release}
+%package static
+Summary:	LLVM static libraries
+Conflicts:	%{name}-devel < 8
 
-%description    devel
-The %{name}-devel package contains libraries and header files for
-developing applications that use %{name}.
+Provides:	llvm-static(major) = %{maj_ver}
 
-%package	help
-Summary: 	Doc files for %{name}
-Buildarch:	noarch
-Requires:	man
-Provides:       %{name}-doc = %{version}-%{release}
-Obsoletes:      %{name}-doc < %{version}-%{release}
+%description static
+Static libraries for the LLVM compiler infrastructure.
 
-%description 	help
-The %{name}-help package contains doc files for %{name}.
+%package test
+Summary:	LLVM regression tests
+Requires:	%{name}%{?_isa} = %{version}-%{release}
+Requires:	%{name}-libs%{?_isa} = %{version}-%{release}
+ 
+Provides:	llvm-test(major) = %{maj_ver}
+
+%description test
+LLVM regression tests.
+ 
+%package googletest
+Summary: LLVM's modified googletest sources
+ 
+%description googletest
+LLVM's modified googletest sources.
 
 %prep
-%autosetup -n %{name}-%{version}.src -p1
-pathfix.py -i %{__python3} -pn test/BugPoint/compile-custom.ll.py tools/opt-viewer/*.py
+%setup -T -q -b 1 -n cmake-%{version}.src
+cd ..
+mv cmake-%{version}.src cmake
+%autosetup -n llvm-%{version}.src
+
+pathfix.py -i %{__python3} -pn \
+	test/BugPoint/compile-custom.ll.py \
+	tools/opt-viewer/*.py \
+	utils/update_cc_test_checks.py
 
 %build
-#TODO: -DLLVM_TARGETS_TO_BUILD=all in needed(temporarily) when build rust,
-#      clarification is required in the future
 mkdir -p _build
 cd _build
-%global optflags %(echo %{optflags} | sed 's/-g /-g1 /')
-%cmake .. -G Ninja \
+
+%cmake	.. -G Ninja \
 	-DBUILD_SHARED_LIBS:BOOL=OFF \
-	-DLLVM_PARALLEL_LINK_JOBS=1 \
-	-DCMAKE_BUILD_TYPE=RelWithDebInfo \
+	-DLLVM_PARALLEL_LINK_JOBS=%{max_link_jobs} \
+	-DCMAKE_BUILD_TYPE=Release \
 	-DCMAKE_SKIP_RPATH:BOOL=ON \
-	-DCMAKE_C_FLAGS_RELWITHDEBINFO="%{optflags} -DNDEBUG -fPIE -fPIC" \
-	-DCMAKE_CXX_FLAGS_RELWITHDEBINFO="%{optflags} -DNDEBUG -fPIE -fPIC" \
-	-DCMAKE_EXE_LINKER_FLAGS_RELWITHDEBINFO="%{optflags} -pie" \
-%if 0%{?__isa_bits} == 64
-	-DLLVM_LIBDIR_SUFFIX=64 \
-%else
-	-DLLVM_LIBDIR_SUFFIX= \
-%endif
-%if 0
-%ifarch %ix86 x86_64
-	-DLLVM_TARGETS_TO_BUILD="X86;AMDGPU;NVPTX;BPF;ARM;AArch64" \
-%endif
-%ifarch aarch64
-	-DLLVM_TARGETS_TO_BUILD="AArch64;AMDGPU;BPF" \
-%endif
-%ifarch %{arm}
-	-DLLVM_TARGETS_TO_BUILD="ARM;AMDGPU;BPF" \
-%endif
-%endif
-	-DLLVM_TARGETS_TO_BUILD=all \
+	-DLLVM_TARGETS_TO_BUILD=%{targets_to_build} \
 	-DLLVM_ENABLE_LIBCXX:BOOL=OFF \
 	-DLLVM_ENABLE_ZLIB:BOOL=ON \
 	-DLLVM_ENABLE_FFI:BOOL=ON \
 	-DLLVM_ENABLE_RTTI:BOOL=ON \
+	-DLLVM_USE_PERF:BOOL=ON \
 	-DLLVM_BINUTILS_INCDIR=%{_includedir} \
-	-DLLVM_EXPERIMENTAL_TARGETS_TO_BUILD=AVR \
+	-DLLVM_EXPERIMENTAL_TARGETS_TO_BUILD=%{experimental_targets_to_build} \
 	-DLLVM_BUILD_RUNTIME:BOOL=ON \
 	-DLLVM_INCLUDE_TOOLS:BOOL=ON \
 	-DLLVM_BUILD_TOOLS:BOOL=ON \
 	-DLLVM_INCLUDE_TESTS:BOOL=ON \
-	-DLLVM_BUILD_TESTS:BOOL=OFF \
+	-DLLVM_BUILD_TESTS:BOOL=ON \
+	-DLLVM_LIT_ARGS=-v \
 	-DLLVM_INCLUDE_EXAMPLES:BOOL=ON \
 	-DLLVM_BUILD_EXAMPLES:BOOL=OFF \
 	-DLLVM_INCLUDE_UTILS:BOOL=ON \
 	-DLLVM_INSTALL_UTILS:BOOL=ON \
-	-DLLVM_UTILS_INSTALL_DIR:PATH=%{_bindir} \
-	-DLLVM_TOOLS_INSTALL_DIR:PATH=bin \
 	-DLLVM_INCLUDE_DOCS:BOOL=ON \
 	-DLLVM_BUILD_DOCS:BOOL=ON \
 	-DLLVM_ENABLE_SPHINX:BOOL=ON \
 	-DLLVM_ENABLE_DOXYGEN:BOOL=OFF \
-	-DLLVM_VERSION_SUFFIX='' \
 	-DLLVM_BUILD_LLVM_DYLIB:BOOL=ON \
-	-DLLVM_DYLIB_EXPORT_ALL:BOOL=ON \
 	-DLLVM_LINK_LLVM_DYLIB:BOOL=ON \
 	-DLLVM_BUILD_EXTERNAL_COMPILER_RT:BOOL=ON \
 	-DLLVM_INSTALL_TOOLCHAIN_ONLY:BOOL=OFF \
+	-DLLVM_DEFAULT_TARGET_TRIPLE=%{llvm_triple} \
 	-DSPHINX_WARNINGS_AS_ERRORS=OFF \
+	-DCMAKE_INSTALL_PREFIX=%{install_prefix} \
 	-DLLVM_INSTALL_SPHINX_HTML_DIR=%{_pkgdocdir}/html \
-	-DSPHINX_EXECUTABLE=%{_bindir}/sphinx-build-3
+	-DSPHINX_EXECUTABLE=%{_bindir}/sphinx-build-3 \
+	-DLLVM_INCLUDE_BENCHMARKS=OFF
 
 %ninja_build LLVM
 %ninja_build
@@ -126,175 +182,177 @@ cd _build
 %install
 %ninja_install -C _build
 
-find %{buildroot}%{_libdir}/cmake/llvm -type f | xargs sed -i "s|%{buildroot}||g"
-mv -v %{buildroot}%{_bindir}/llvm-config{,-%{__isa_bits}}
+mkdir -p %{buildroot}/%{_bindir}
 
-for f in llvm-isel-fuzzer llvm-opt-fuzzer; do
-install -m 0755 ./_build/bin/$f %{buildroot}%{_bindir}
+# Install binaries needed for lit tests
+for f in llvm-isel-fuzzer llvm-opt-fuzzer
+do
+   install -m 0755 %{_builddir}/llvm-%{version}.src/_build/bin/$f %{buildroot}%{install_bindir}
+done
+ 
+install %{_builddir}/llvm-%{version}.src/_build/lib/libLLVMTestingSupport.a %{buildroot}%{install_libdir}
+
+# Install gtest sources so clang can use them for gtest
+install -d %{buildroot}%{install_srcdir}
+install -d %{buildroot}%{install_srcdir}/utils/
+cp -R %{_builddir}/llvm-%{version}.src/utils/unittest %{buildroot}%{install_srcdir}/utils/
+ 
+# Clang needs these for running lit tests.
+cp %{_builddir}/llvm-%{version}.src/utils/update_cc_test_checks.py %{buildroot}%{install_srcdir}/utils/
+cp -R %{_builddir}/llvm-%{version}.src/utils/UpdateTestChecks %{buildroot}%{install_srcdir}/utils/
+
+%if %{without sys_llvm}
+# Add version suffix to binaries
+for f in %{buildroot}/%{install_bindir}/*; do
+  filename=`basename $f`
+  ln -s ../../%{install_bindir}/$filename %{buildroot}/%{_bindir}/$filename%{bin_suffix}
+done
+%endif
+
+# Move header files
+mkdir -p %{buildroot}/%{pkg_includedir}
+ln -s ../../../%{install_includedir}/llvm %{buildroot}/%{pkg_includedir}/llvm
+ln -s ../../../%{install_includedir}/llvm-c %{buildroot}/%{pkg_includedir}/llvm-c
+
+# Fix multi-lib
+%multilib_fix_c_header --file %{install_includedir}/llvm/Config/llvm-config.h
+
+# Create ld.so.conf.d entry
+mkdir -p %{buildroot}%{_sysconfdir}/ld.so.conf.d
+cat >> %{buildroot}%{_sysconfdir}/ld.so.conf.d/%{name}-%{_arch}.conf << EOF
+%{pkg_libdir}
+EOF
+
+%if %{without sys_llvm}
+mkdir -p %{buildroot}/%{_mandir}/man1
+for f in %{build_install_prefix}/share/man/man1/*; do
+  filename=`basename $f | cut -f 1 -d '.'`
+  mv $f %{buildroot}%{_mandir}/man1/$filename%{bin_suffix}.1
 done
 
-%global install_srcdir %{buildroot}%{_datadir}/llvm/src
-%global lit_cfg test/lit.site.cfg.py
-%global lit_unit_cfg test/Unit/lit.site.cfg.py
+rm %{buildroot}%{_bindir}/llvm-config%{bin_suffix}
+(cd %{buildroot}/%{pkg_bindir} ; ln -s llvm-config llvm-config%{bin_suffix}-%{__isa_bits} )
 
-install -d %{install_srcdir}
-install -d %{install_srcdir}/utils/
-cp -R utils/unittest %{install_srcdir}/utils/
+touch %{buildroot}%{_bindir}/llvm-config%{bin_suffix}
+%endif
 
-cat _build/test/lit.site.cfg.py >> %{lit_cfg}
-cat _build/test/Unit/lit.site.cfg.py >> %{lit_unit_cfg}
-sed -i -e s~`pwd`/_build~%{_prefix}~g -e s~`pwd`~.~g %{lit_cfg} %{lit_cfg} %{lit_unit_cfg}
+# Remove opt-viewer, since this is just a compatibility package.
+rm -Rf %{build_install_prefix}/share/opt-viewer
 
-sed -i 's~\(config.llvm_obj_root = \)"[^"]\+"~\1"%{_libdir}/%{name}"~' %{lit_unit_cfg}
-
-install -d %{buildroot}%{_libexecdir}/tests/llvm
-
-install -d %{buildroot}%{_datadir}/llvm/
-tar -czf %{install_srcdir}/test.tar.gz test/
-
-mkdir -p %{buildroot}%{_libdir}/%{name}
-cp -R _build/unittests %{buildroot}%{_libdir}/%{name}/
-find %{buildroot}%{_libdir}/%{name} -ignore_readdir_race -iname 'cmake*' -exec rm -Rf '{}' ';' || true
+cp -Rv ../cmake/Modules/* %{buildroot}%{pkg_libdir}/cmake/llvm
 
 %check
 %if %{with check}
-cd _build
-ninja check-all || :
+LD_LIBRARY_PATH=%{buildroot}/%{pkg_libdir}  %{__ninja} check-all -C ./_build/
 %endif
 
-%post -p /sbin/ldconfig
-%postun -p /sbin/ldconfig
+%ldconfig_scriptlets libs
 
 %post devel
-%{_sbindir}/update-alternatives --install %{_bindir}/llvm-config llvm-config %{_bindir}/llvm-config-%{__isa_bits} %{__isa_bits}
+%if %{without sys_llvm}
+%{_sbindir}/update-alternatives --install %{_bindir}/llvm-config%{bin_suffix} llvm-config%{bin_suffix} %{pkg_bindir}/llvm-config%{bin_suffix}-%{__isa_bits} %{__isa_bits}
+%endif
 
 %postun devel
+%if %{without sys_llvm}
 if [ $1 -eq 0 ]; then
-  %{_sbindir}/update-alternatives --remove llvm-config %{_bindir}/llvm-config-%{__isa_bits}
+  %{_sbindir}/update-alternatives --remove llvm-config%{bin_suffix} %{pkg_bindir}/llvm-config%{bin_suffix}-%{__isa_bits}
 fi
+%endif
 
 %files
 %license LICENSE.TXT
+%exclude %{_mandir}/man1/llvm-config*
+%{_mandir}/man1/*
+%{pkg_bindir}/*
+
+%if %{without sys_llvm}
 %{_bindir}/*
-%{_libdir}/%{name}/*
-%{_datadir}/opt-viewer/*
-%exclude %{_bindir}/llvm-config-%{__isa_bits}
-%exclude %{_libdir}/%{name}/unittests/
+%exclude %{_bindir}/llvm-config%{bin_suffix}
+%exclude %{pkg_bindir}/llvm-config%{bin_suffix}-%{__isa_bits}
+%exclude %{_bindir}/not%{bin_suffix}
+%exclude %{_bindir}/count%{bin_suffix}
+%exclude %{_bindir}/yaml-bench%{bin_suffix}
+%exclude %{_bindir}/lli-child-target%{bin_suffix}
+%exclude %{_bindir}/llvm-isel-fuzzer%{bin_suffix}
+%exclude %{_bindir}/llvm-opt-fuzzer%{bin_suffix}
+%endif
+
+%exclude %{pkg_bindir}/not
+%exclude %{pkg_bindir}/count
+%exclude %{pkg_bindir}/yaml-bench
+%exclude %{pkg_bindir}/lli-child-target
+%exclude %{pkg_bindir}/llvm-isel-fuzzer
+%exclude %{pkg_bindir}/llvm-opt-fuzzer
 
 %files libs
-%{_libdir}/*.so*
-%exclude %{_libdir}/libLLVM.so
+%license LICENSE.TXT
+%{pkg_libdir}/libLLVM-%{maj_ver}.so
+%config(noreplace) %{_sysconfdir}/ld.so.conf.d/%{name}-%{_arch}.conf
+%{pkg_libdir}/LLVMgold.so
+%{pkg_libdir}/libLLVM-%{maj_ver}.%{min_ver}*.so
+%{pkg_libdir}/libLTO.so*
+%exclude %{pkg_libdir}/libLTO.so
+%{pkg_libdir}/libRemarks.so*
 
 %files devel
-%{_bindir}/llvm-config-%{__isa_bits}
-%{_includedir}/llvm/*
-%{_includedir}/llvm-c/*
-%{_libdir}/cmake/llvm/*
-%{_libdir}/libLLVM.so
-%{_libdir}/*.a
-%{_datadir}/llvm/src/utils
-%{_libdir}/%{name}/unittests/
-%{_datadir}/llvm/src/test.tar.gz
+%license LICENSE.TXT
 
-%files help
+%if %{without sys_llvm}
+%ghost %{_bindir}/llvm-config%{bin_suffix}
+%{pkg_bindir}/llvm-config%{bin_suffix}-%{__isa_bits}
+%endif
+
+%{_mandir}/man1/llvm-config*
+%{pkg_includedir}/llvm
+%{pkg_includedir}/llvm-c
+%{pkg_libdir}/libLTO.so
+%{pkg_libdir}/libLLVM.so
+%{pkg_libdir}/cmake/llvm
+
+%files doc
+%license LICENSE.TXT
 %doc %{_pkgdocdir}/html
-%{_mandir}/man1/*
+
+%files static
+%license LICENSE.TXT
+%{pkg_libdir}/*.a
+%exclude %{pkg_libdir}/libLLVMTestingSupport.a
+
+%files test
+%license LICENSE.TXT
+%if %{without sys_llvm}
+%{_bindir}/not%{bin_suffix}
+%{_bindir}/count%{bin_suffix}
+%{_bindir}/yaml-bench%{bin_suffix}
+%{_bindir}/lli-child-target%{bin_suffix}
+%{_bindir}/llvm-isel-fuzzer%{bin_suffix}
+%{_bindir}/llvm-opt-fuzzer%{bin_suffix}
+%endif
+%{pkg_bindir}/not
+%{pkg_bindir}/count
+%{pkg_bindir}/yaml-bench
+%{pkg_bindir}/lli-child-target
+%{pkg_bindir}/llvm-isel-fuzzer
+%{pkg_bindir}/llvm-opt-fuzzer
+ 
+%files googletest
+%license LICENSE.TXT
+%{pkg_srcdir}/utils
+%{pkg_libdir}/libLLVMTestingSupport.a
 
 %changelog
-* Tue Feb 14 2023 cf-zhao <zhaochuanfeng@huawei.com> - 12.0.1-5
-- Disable check temporarily to avoid a build error that `rmbuild` cannot
-- remove a file due to no permission.
+* May 19 2023 cf-zhao <zhaochuanfeng@huawei.com> -15.0.7-2
+- Make this spec file support both system-version and multi-version.
 
-* Wed Dec 21 2022 eastb233 <xiezhiheng@huawei.com> - 12.0.1-4
-- Type: Compile Option
-- ID: NA
-- SUG: NA
-- DESC: Add -fPIE and -pie options
+* Mon Feb 20 2023 Chenxi Mao <chenxi.mao@suse.com> - 15.0.7-1
+- Upgrade to 15.0.7.
 
-* Tue Aug 23 2022 guopeilin <guopeilin1@huawei.com> - 12.0.1-3
-- Type: enhancement
-- ID: NA
-- SUG: NA
-- DESC: Delete the .so file of old version
+* Wed Feb 8 2023 Chenxi Mao <chenxi.mao@suse.com> - 15.0.6-3
+- Create llvm-test/googletest to support clang/lld unit test.
 
-* Tue Feb 8 2022 zhangweiguo <zhangweiguo2@huawei.com> - 12.0.1-2
-- Type: enhancement
-- ID: NA
-- SUG: NA
-- DESC: Disabe DLLVM_BUILD_TEST
+* Fri Feb 3 2023 Chenxi Mao <chenxi.mao@suse.com> - 15.0.6-2
+- Enable llvm utils tools.
 
-* Mon Dec 13 2021 zoulin <zoulin13@huawei.com> - 12.0.1-1
-- Type: enhancement
-- ID: NA
-- SUG: NA
-- DESC: Update version to 12.0.1
-
-* Wed Sep 8 2021 zhangruifang <zhangruifang1@huawei.com> - 10.0.1-4
-- Type: enhancement
-- ID: NA
-- SUG: NA
-- DESC: Remove rpath
-
-* Wed Oct 14 2020 Hugel <gengqihu1@huawei.com> - 10.0.1-3
-- Type: enhancement
-- ID: NA
-- SUG: NA
-- DESC: Delete the .so file of old version
-
-* Tue Aug 18 2020 Liquor <lirui130@huawei.com> - 10.0.1-2
-- Type: bugfix
-- ID: NA
-- SUG: NA
-- DESC:Use -DLLVM_TARGETS_TO_BUILD=all in configure
-
-* Tue Jul 28 2020 Liquor <lirui130@huawei.com> - 10.0.1-1
-- Type: update
-- ID: NA
-- SUG: NA
-- DESC:update to 10.0.1
-
-* Wed Jul 22 2020 Hugel <gengqihu1@huawei.com> - 7.0.0-10
-- Type: enhancement
-- ID: NA
-- SUG: NA
-- DESC: Ensure that variant part discriminator is read by MetadataLoader
-        Fix Assembler/debug-info.ll
-
-* Wed Mar 18 2020 openEuler Buildteam <buildteam@openeuler.org> - 7.0.0-9
-- Type: enhancement
-- ID: NA
-- SUG: NA
-- DESC: add four patches
-
-* Sat Jan 11 2020 openEuler Buildteam <buildteam@openeuler.org> - 7.0.0-8
-- Type: enhancement
-- ID: NA
-- SUG: NA
-- DESC: remove unnecessary files
-
-* Tue Dec 31 2019 openEuler Buildteam <buildteam@openeuler.org> -7.0.0-7
-- Type: enhancement
-- ID: NA
-- SUG: NA
-- DESC: delete conflict files in llvm
-
-* Fri Nov 1 2019 jiangchuangang <jiangchuangang@huawei.com> -7.0.0-6
-- Type: enhancement
-- ID: NA
-- SUG: NA
-- DESC: add libs package
-
-* Mon Oct 28 2019 jiangchuangang <jiangchuangang@huawei.com> -7.0.0-5
-- Type: enhancement
-- ID: NA
-- SUG: NA
-- DESC: add test files
-
-* Sun Sep 29 2019 luhuaxin <luhuaxin@huawei.com> - 7.0.0-4
-- Type: enhancement
-- ID: NA
-- SUG: NA
-- DESC: add license file
-
-* Fri Sep 20 2019 luhuaxin <luhuaxin@huawei.com> - 7.0.0-3
+* Mon Jan 2 2023 Chenxi Mao <chenxi.mao@suse.com> - 15.0.6-1
 - Package init
