@@ -17,7 +17,11 @@
 
 %global install_bindir %{install_prefix}/bin
 %global install_includedir %{install_prefix}/include
+%if 0%{?__isa_bits} == 64
+%global install_libdir %{install_prefix}/lib64
+%else
 %global install_libdir %{install_prefix}/lib
+%endif
 %global install_srcdir %{install_prefix}/src
 
 %global pkg_bindir %{install_bindir}
@@ -174,6 +178,11 @@ cd _build
 	-DCMAKE_INSTALL_PREFIX=%{install_prefix} \
 	-DLLVM_INSTALL_SPHINX_HTML_DIR=%{_pkgdocdir}/html \
 	-DSPHINX_EXECUTABLE=%{_bindir}/sphinx-build-3 \
+%if 0%{?__isa_bits} == 64
+	-DLLVM_LIBDIR_SUFFIX=64 \
+%else
+	-DLLVM_LIBDIR_SUFFIX= \
+%endif
 	-DLLVM_INCLUDE_BENCHMARKS=OFF
 
 %ninja_build LLVM
@@ -189,8 +198,12 @@ for f in llvm-isel-fuzzer llvm-opt-fuzzer
 do
    install -m 0755 %{_builddir}/llvm-%{version}.src/_build/bin/$f %{buildroot}%{install_bindir}
 done
- 
+
+%if 0%{?__isa_bits} == 64
+install %{_builddir}/llvm-%{version}.src/_build/lib64/libLLVMTestingSupport.a %{buildroot}%{install_libdir}
+%else
 install %{_builddir}/llvm-%{version}.src/_build/lib/libLLVMTestingSupport.a %{buildroot}%{install_libdir}
+%endif
 
 # Install gtest sources so clang can use them for gtest
 install -d %{buildroot}%{install_srcdir}
