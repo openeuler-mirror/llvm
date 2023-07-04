@@ -1,0 +1,130 @@
+commit a831cf03a32854ac193389819189e6ee93b0ecaf
+Author: wangpc <pc.wang@linux.alibaba.com>
+Date:   Tue Jun 6 17:49:58 2023 +0800
+
+    [Backport][RISCV] Handle "o" inline asm memory constraint
+    
+    Reference: https://reviews.llvm.org/rG26e41a80d07c
+    
+    Originally By: wangpc <pc.wang@linux.alibaba.com>
+    
+    This is the same as D100412.
+    
+    We just found the same crash when we tried to compile some packages
+    like mariadb, php, etc.
+    
+    For constraint "o", it means "A memory operand is allowed, but
+    only if the address is offsettable". So I think it can be handled
+    just like constraint "m" for RISCV target.
+    
+    And we print verbose information when unsupported constraints occur.
+    
+    Reviewed By: asb
+    
+    Differential Revision: https://reviews.llvm.org/D151979
+
+diff --git a/llvm/lib/Target/RISCV/RISCVISelDAGToDAG.cpp b/llvm/lib/Target/RISCV/RISCVISelDAGToDAG.cpp
+index d5826b46d738..a98dcea7dd8d 100644
+--- a/llvm/lib/Target/RISCV/RISCVISelDAGToDAG.cpp
++++ b/llvm/lib/Target/RISCV/RISCVISelDAGToDAG.cpp
+@@ -1733,6 +1733,7 @@ void RISCVDAGToDAGISel::Select(SDNode *Node) {
+ bool RISCVDAGToDAGISel::SelectInlineAsmMemoryOperand(
+     const SDValue &Op, unsigned ConstraintID, std::vector<SDValue> &OutOps) {
+   switch (ConstraintID) {
++  case InlineAsm::Constraint_o:
+   case InlineAsm::Constraint_m:
+     // We just support simple memory operands that have a single address
+     // operand and need no special handling.
+@@ -1742,7 +1743,8 @@ bool RISCVDAGToDAGISel::SelectInlineAsmMemoryOperand(
+     OutOps.push_back(Op);
+     return false;
+   default:
+-    break;
++    report_fatal_error("Unexpected asm memory constraint " +
++                       InlineAsm::getMemConstraintName(ConstraintID));
+   }
+ 
+   return true;
+diff --git a/llvm/test/CodeGen/RISCV/inline-asm.ll b/llvm/test/CodeGen/RISCV/inline-asm.ll
+index 0b04a7df2d18..feaa40b14e9d 100644
+--- a/llvm/test/CodeGen/RISCV/inline-asm.ll
++++ b/llvm/test/CodeGen/RISCV/inline-asm.ll
+@@ -82,6 +82,78 @@ define i32 @constraint_m2(i32* %a) nounwind {
+   ret i32 %1
+ }
+ 
++define i32 @constraint_m_with_offset(ptr %a) nounwind {
++; RV32I-LABEL: constraint_m_with_offset:
++; RV32I:       # %bb.0:
++; RV32I-NEXT:    #APP
++; RV32I-NEXT:    lw a0, 4(a0)
++; RV32I-NEXT:    #NO_APP
++; RV32I-NEXT:    ret
++;
++; RV64I-LABEL: constraint_m_with_offset:
++; RV64I:       # %bb.0:
++; RV64I-NEXT:    #APP
++; RV64I-NEXT:    lw a0, 4(a0)
++; RV64I-NEXT:    #NO_APP
++; RV64I-NEXT:    ret
++  %1 = getelementptr i32, ptr %a, i32 1
++  %2 = tail call i32 asm "lw $0, $1", "=r,*m"(ptr elementtype(i32) %1)
++  ret i32 %2
++}
++
++define void @constraint_o(ptr %a) nounwind {
++; RV32I-LABEL: constraint_o:
++; RV32I:       # %bb.0:
++; RV32I-NEXT:    #APP
++; RV32I-NEXT:    #NO_APP
++; RV32I-NEXT:    ret
++;
++; RV64I-LABEL: constraint_o:
++; RV64I:       # %bb.0:
++; RV64I-NEXT:    #APP
++; RV64I-NEXT:    #NO_APP
++; RV64I-NEXT:    ret
++  call void asm sideeffect "", "=*o"(ptr elementtype(i32) %a)
++  ret void
++}
++
++define i32 @constraint_o2(ptr %a) nounwind {
++; RV32I-LABEL: constraint_o2:
++; RV32I:       # %bb.0:
++; RV32I-NEXT:    #APP
++; RV32I-NEXT:    lw a0, 0(a0)
++; RV32I-NEXT:    #NO_APP
++; RV32I-NEXT:    ret
++;
++; RV64I-LABEL: constraint_o2:
++; RV64I:       # %bb.0:
++; RV64I-NEXT:    #APP
++; RV64I-NEXT:    lw a0, 0(a0)
++; RV64I-NEXT:    #NO_APP
++; RV64I-NEXT:    ret
++  %1 = tail call i32 asm "lw $0, $1", "=r,*o"(ptr elementtype(i32) %a)
++  ret i32 %1
++}
++
++define i32 @constraint_o_with_offset(ptr %a) nounwind {
++; RV32I-LABEL: constraint_o_with_offset:
++; RV32I:       # %bb.0:
++; RV32I-NEXT:    #APP
++; RV32I-NEXT:    lw a0, 4(a0)
++; RV32I-NEXT:    #NO_APP
++; RV32I-NEXT:    ret
++;
++; RV64I-LABEL: constraint_o_with_offset:
++; RV64I:       # %bb.0:
++; RV64I-NEXT:    #APP
++; RV64I-NEXT:    lw a0, 4(a0)
++; RV64I-NEXT:    #NO_APP
++; RV64I-NEXT:    ret
++  %1 = getelementptr i32, ptr %a, i32 1
++  %2 = tail call i32 asm "lw $0, $1", "=r,*o"(ptr elementtype(i32) %1)
++  ret i32 %2
++}
++
+ define void @constraint_I() nounwind {
+ ; RV32I-LABEL: constraint_I:
+ ; RV32I:       # %bb.0:
