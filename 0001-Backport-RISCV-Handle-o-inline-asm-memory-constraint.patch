@@ -1,27 +1,30 @@
-commit a831cf03a32854ac193389819189e6ee93b0ecaf
-Author: wangpc <pc.wang@linux.alibaba.com>
-Date:   Tue Jun 6 17:49:58 2023 +0800
+From a831cf03a32854ac193389819189e6ee93b0ecaf Mon Sep 17 00:00:00 2001
+From: wangpc <pc.wang@linux.alibaba.com>
+Date: Tue, 6 Jun 2023 17:49:58 +0800
+Subject: [PATCH] [Backport][RISCV] Handle "o" inline asm memory constraint
 
-    [Backport][RISCV] Handle "o" inline asm memory constraint
-    
-    Reference: https://reviews.llvm.org/rG26e41a80d07c
-    
-    Originally By: wangpc <pc.wang@linux.alibaba.com>
-    
-    This is the same as D100412.
-    
-    We just found the same crash when we tried to compile some packages
-    like mariadb, php, etc.
-    
-    For constraint "o", it means "A memory operand is allowed, but
-    only if the address is offsettable". So I think it can be handled
-    just like constraint "m" for RISCV target.
-    
-    And we print verbose information when unsupported constraints occur.
-    
-    Reviewed By: asb
-    
-    Differential Revision: https://reviews.llvm.org/D151979
+Reference: https://reviews.llvm.org/rG26e41a80d07c
+
+Originally By: wangpc <pc.wang@linux.alibaba.com>
+
+This is the same as D100412.
+
+We just found the same crash when we tried to compile some packages
+like mariadb, php, etc.
+
+For constraint "o", it means "A memory operand is allowed, but
+only if the address is offsettable". So I think it can be handled
+just like constraint "m" for RISCV target.
+
+And we print verbose information when unsupported constraints occur.
+
+Reviewed By: asb
+
+Differential Revision: https://reviews.llvm.org/D151979
+---
+ llvm/lib/Target/RISCV/RISCVISelDAGToDAG.cpp |  4 +-
+ llvm/test/CodeGen/RISCV/inline-asm.ll       | 72 +++++++++++++++++++++
+ 2 files changed, 75 insertions(+), 1 deletion(-)
 
 diff --git a/llvm/lib/Target/RISCV/RISCVISelDAGToDAG.cpp b/llvm/lib/Target/RISCV/RISCVISelDAGToDAG.cpp
 index d5826b46d738..a98dcea7dd8d 100644
@@ -128,3 +131,6 @@ index 0b04a7df2d18..feaa40b14e9d 100644
  define void @constraint_I() nounwind {
  ; RV32I-LABEL: constraint_I:
  ; RV32I:       # %bb.0:
+-- 
+2.27.0
+
