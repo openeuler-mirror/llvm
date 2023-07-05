@@ -46,7 +46,7 @@ URL:		http://llvm.org
 Source0:	https://github.com/llvm/llvm-project/releases/download/llvmorg-%{version}/llvm-%{version}.src.tar.xz
 Source1:	https://github.com/llvm/llvm-project/releases/download/llvmorg-%{version}/cmake-%{version}.src.tar.xz
 
-Patch1:		0001-RISCV-handle-o-inline-asm-memory-constraint.patch
+Patch1:		0001-Backport-RISCV-Handle-o-inline-asm-memory-constraint.patch
 
 BuildRequires:	binutils-devel
 BuildRequires:	cmake
