@@ -133,7 +133,7 @@ LLVM's modified googletest sources.
 %setup -T -q -b 1 -n cmake-%{version}.src
 cd ..
 mv cmake-%{version}.src cmake
-%autosetup -n llvm-%{version}.src
+%setup -T -q -b 0 -n llvm-%{version}.src
 %autopatch -p2
 
 pathfix.py -i %{__python3} -pn \
