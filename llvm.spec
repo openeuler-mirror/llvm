@@ -134,7 +134,7 @@ LLVM's modified googletest sources.
 cd ..
 mv cmake-%{version}.src cmake
 %autosetup -n llvm-%{version}.src
-%autopatch -M200 -p2
+%autopatch -p2
 
 pathfix.py -i %{__python3} -pn \
 	test/BugPoint/compile-custom.ll.py \
