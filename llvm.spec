@@ -38,13 +38,15 @@
 
 Name:		%{pkg_name}
 Version:	%{maj_ver}.%{min_ver}.%{patch_ver}
-Release:	2
+Release:	3
 Summary:	The Low Level Virtual Machine
 
 License:	NCSA
 URL:		http://llvm.org
 Source0:	https://github.com/llvm/llvm-project/releases/download/llvmorg-%{version}/llvm-%{version}.src.tar.xz
 Source1:	https://github.com/llvm/llvm-project/releases/download/llvmorg-%{version}/cmake-%{version}.src.tar.xz
+
+Patch1:		0001-Backport-RISCV-Handle-o-inline-asm-memory-constraint.patch
 
 BuildRequires:	binutils-devel
 BuildRequires:	cmake
@@ -131,7 +133,8 @@ LLVM's modified googletest sources.
 %setup -T -q -b 1 -n cmake-%{version}.src
 cd ..
 mv cmake-%{version}.src cmake
-%autosetup -n llvm-%{version}.src
+%setup -T -q -b 0 -n llvm-%{version}.src
+%autopatch -p2
 
 pathfix.py -i %{__python3} -pn \
 	test/BugPoint/compile-custom.ll.py \
@@ -355,7 +358,10 @@ fi
 %{pkg_libdir}/libLLVMTestingSupport.a
 
 %changelog
-* May 19 2023 cf-zhao <zhaochuanfeng@huawei.com> -15.0.7-2
+* Tue Jul 04 2023 cf-zhao <zhaochuanfeng@huawei.com> - 15.0.7-3
+- [RISCV] Handle "o" inline asm memory constraint
+
+* Fri May 19 2023 cf-zhao <zhaochuanfeng@huawei.com> -15.0.7-2
 - Make this spec file support both system-version and multi-version.
 
 * Mon Feb 20 2023 Chenxi Mao <chenxi.mao@suse.com> - 15.0.7-1
